@@ -79,8 +79,8 @@ func (broker *Broker) NotifyClientConnected(client Client) {
 	broker.newClients <- client
 }
 
-// NotifyClientDisconnecting notifies a client is gone
-func (broker *Broker) NotifyClientDisconnecting(client Client) {
+// NotifyClientDisconnected notifies a client is gone
+func (broker *Broker) NotifyClientDisconnected(client Client) {
 	broker.closingClients <- client
 }
 

@@ -52,14 +52,14 @@ func (api *NotificationAPI) NotificationStreamingHandler(w http.ResponseWriter, 
 
 	// Remove this client from the map of connected clients when this handler exits
 	defer func() {
-		api.Broker.NotifyClientDisconnecting(client)
+		api.Broker.NotifyClientDisconnected(client)
 	}()
 
 	// Unregisters closed connections
 	notifyClosed := r.Context().Done()
 	go func() {
 		<-notifyClosed
-		api.Broker.NotifyClientDisconnecting(client)
+		api.Broker.NotifyClientDisconnected(client)
 	}()
 
 	for {
