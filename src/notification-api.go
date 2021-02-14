@@ -23,6 +23,13 @@ func NewNotificationAPI(broker *Broker) (api NotificationAPI) {
 	return
 }
 
+type streamNotificationsResponse struct {
+	EventID  string `json:"eventID,omitempty"`
+	SourceID string `json:"sourceID,omitempty"`
+	ClientID string `json:"clientID,omitempty"`
+	Content  string `json:"data,omitempty"`
+}
+
 // StreamNotificationsHandler is the endpoint for clients listening for notifications
 func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r *http.Request) {
 	// Checks if SSE is possible
@@ -63,16 +70,32 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 	}()
 
 	for {
-		// Send events to client
+		// Get event for client
 		event := <-clientChan
-		fmt.Fprintf(w,
-			"data: {\"id\":\"%s\",\"sourceID\":\"%s\",\"clientID\":\"%s\",\"content\":\"%s\"}\n\n",
-			event.ID, event.SourceID, event.DestinationID, event.Data)
+
+		// Encode the event
+		response := streamNotificationsResponse{
+			EventID:  event.ID,
+			SourceID: event.SourceID,
+			ClientID: event.DestinationID,
+			Content:  event.Data,
+		}
+		jsonResponse, err := json.Marshal(&response)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Send it
+		fmt.Fprintf(w, "data: %s\n\n", string(jsonResponse))
 
 		// Flush the data immediatly instead of buffering it for later
 		// so client receives it right on
 		flusher.Flush()
 	}
+}
+
+type newEventResponse struct {
+	EventID string `json:"eventID"`
 }
 
 // NotifyEventHandler is the endpoint to publishs events from source to destination
@@ -93,7 +116,12 @@ func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 
-	fmt.Fprintf(w, "{\"eventID\":\"%s\"}\n", event.ID)
+	response := newEventResponse{
+		EventID: event.ID,
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // BrodcastEventHandler is the endpoint to publishs events from source to many destinations
@@ -109,9 +137,9 @@ func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.
 
 	brodcastEvent.ID = fmt.Sprint(time.Now().Unix())
 
-	log.Printf("Receiving event to broadcast from source %s to %s destinations", brodcastEvent.SourceID, brodcastEvent.DestinationListID)
+	log.Printf("Receiving event to broadcast from source %s to %s destinations", brodcastEvent.SourceID, brodcastEvent.Destinations)
 
-	for _, destinationID := range brodcastEvent.DestinationListID {
+	for _, destinationID := range brodcastEvent.Destinations {
 		event := Event{
 			ID:            brodcastEvent.ID,
 			SourceID:      brodcastEvent.SourceID,
@@ -123,7 +151,12 @@ func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 
-	fmt.Fprintf(w, "{\"eventID\":\"%s\"}\n", brodcastEvent.ID)
+	response := newEventResponse{
+		EventID: brodcastEvent.ID,
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // GetNotificationsHandler responds with notifications owned by a given client
