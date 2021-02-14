@@ -23,6 +23,71 @@ func NewNotificationAPI(broker *Broker) (api NotificationAPI) {
 	return
 }
 
+type newEventResponse struct {
+	EventID string `json:"eventID"`
+}
+
+// NotifyEventHandler is the endpoint to publishs events from source to destination
+func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Request) {
+	var event Event
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&event)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	event.ID = fmt.Sprint(time.Now().Unix())
+
+	log.Printf("Receiving event for client %s from source %s", event.DestinationID, event.SourceID)
+	api.Broker.NotifyEvent(event)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	response := newEventResponse{
+		EventID: event.ID,
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// BrodcastEventHandler is the endpoint to publishs events from source to many destinations
+func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.Request) {
+	var brodcastEvent BrodcastEvent
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&brodcastEvent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	brodcastEvent.ID = fmt.Sprint(time.Now().Unix())
+
+	log.Printf("Receiving event to broadcast from source %s to %s destinations", brodcastEvent.SourceID, brodcastEvent.Destinations)
+
+	for _, destinationID := range brodcastEvent.Destinations {
+		event := Event{
+			ID:            brodcastEvent.ID,
+			SourceID:      brodcastEvent.SourceID,
+			DestinationID: destinationID,
+			Data:          brodcastEvent.Data,
+		}
+		api.Broker.NotifyEvent(event)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	response := newEventResponse{
+		EventID: brodcastEvent.ID,
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 type streamNotificationsResponse struct {
 	EventID  string `json:"eventID,omitempty"`
 	SourceID string `json:"sourceID,omitempty"`
@@ -94,69 +159,9 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 	}
 }
 
-type newEventResponse struct {
-	EventID string `json:"eventID"`
-}
-
-// NotifyEventHandler is the endpoint to publishs events from source to destination
-func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Request) {
-	var event Event
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&event)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	event.ID = fmt.Sprint(time.Now().Unix())
-
-	log.Printf("Receiving event for client %s from source %s", event.DestinationID, event.SourceID)
-	api.Broker.NotifyEvent(event)
-
-	w.Header().Set("Content-Type", "application/json")
-
-	response := newEventResponse{
-		EventID: event.ID,
-	}
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-// BrodcastEventHandler is the endpoint to publishs events from source to many destinations
-func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.Request) {
-	var brodcastEvent BrodcastEvent
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&brodcastEvent)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	brodcastEvent.ID = fmt.Sprint(time.Now().Unix())
-
-	log.Printf("Receiving event to broadcast from source %s to %s destinations", brodcastEvent.SourceID, brodcastEvent.Destinations)
-
-	for _, destinationID := range brodcastEvent.Destinations {
-		event := Event{
-			ID:            brodcastEvent.ID,
-			SourceID:      brodcastEvent.SourceID,
-			DestinationID: destinationID,
-			Data:          brodcastEvent.Data,
-		}
-		api.Broker.NotifyEvent(event)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	response := newEventResponse{
-		EventID: brodcastEvent.ID,
-	}
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+type notificationsResponse struct {
+	ClientID string  `json:"clientID,omitempty"`
+	Events   []Event `json:"events"`
 }
 
 // GetNotificationsHandler responds with notifications owned by a given client
@@ -164,9 +169,91 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
 
-	log.Printf("Getting notificatins of client %s", clientID)
+	log.Printf("Getting notifications of client %s", clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
-	fmt.Fprintf(w, "{\"clientID\":\"%s\",\"notifications\":[]}\n", clientID)
+	response := notificationsResponse{
+		ClientID: clientID,
+		Events: []Event{
+			{
+				ID:            "666",
+				SourceID:      "stub",
+				DestinationID: clientID,
+				Data:          "stub stuff",
+			},
+		},
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+type notificationResponse struct {
+	ClientID string `json:"clientID,omitempty"`
+	Event    Event  `json:"event,omitempty"`
+}
+
+// GetNotificationHandler responds with a event notification by its id
+func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	clientID := vars["clientID"]
+	eventID := vars["eventID"]
+
+	log.Printf("Getting notification %s of client %s", eventID, clientID)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	response := notificationResponse{
+		ClientID: clientID,
+		Event: Event{
+			ID:            "666",
+			SourceID:      "stub",
+			DestinationID: clientID,
+			Data:          "stub stuff",
+		},
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+type changeNotificationStatusResponse struct {
+	Status string `json:"status,omitempty"`
+}
+
+// MarkNotificationReadHandler changes the notificatinn status to read
+func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	clientID := vars["clientID"]
+	eventID := vars["eventID"]
+
+	log.Printf("Marking notification %s of client %s as read", eventID, clientID)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	response := changeNotificationStatusResponse{
+		Status: "read",
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// MarkNotificationUnreadHandler changes the notificatinn status to unread
+func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	clientID := vars["clientID"]
+	eventID := vars["eventID"]
+
+	log.Printf("Marking notification %s of client %s as unread", eventID, clientID)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	response := changeNotificationStatusResponse{
+		Status: "unread",
+	}
+	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

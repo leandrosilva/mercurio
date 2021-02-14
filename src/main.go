@@ -19,8 +19,11 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/notify", api.NotifyEventHandler).Methods("POST")
 	router.HandleFunc("/broadcast", api.BrodcastEventHandler).Methods("POST")
-	router.HandleFunc("/notifications/{clientID}", api.GetNotificationsHandler)
 	router.HandleFunc("/notifications/{clientID}/stream", api.StreamNotificationsHandler)
+	router.HandleFunc("/notifications/{clientID}", api.GetNotificationsHandler)
+	router.HandleFunc("/notifications/{clientID}/{eventID}", api.GetNotificationHandler)
+	router.HandleFunc("/notifications/{clientID}/{eventID}/read", api.MarkNotificationReadHandler).Methods("PUT")
+	router.HandleFunc("/notifications/{clientID}/{eventID}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
 
 	server := &http.Server{
 		Addr:    "127.0.0.1:8000",
