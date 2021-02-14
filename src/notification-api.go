@@ -23,8 +23,8 @@ func NewNotificationAPI(broker *Broker) (api NotificationAPI) {
 	return
 }
 
-// NotificationStreamingHandler is the endpoint for clients listening for notifications
-func (api *NotificationAPI) NotificationStreamingHandler(w http.ResponseWriter, r *http.Request) {
+// StreamNotificationsHandler is the endpoint for clients listening for notifications
+func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r *http.Request) {
 	// Checks if SSE is possible
 	flusher, ok := w.(http.Flusher)
 	if !ok {
