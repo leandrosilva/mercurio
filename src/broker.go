@@ -50,7 +50,7 @@ func (broker *Broker) Run() {
 			case event := <-broker.notifications:
 				// We got a new event from the outside!
 				// Send event to the target client
-				client, exists := broker.clients[event.ClientID]
+				client, exists := broker.clients[event.DestinationID]
 				if exists {
 					client.Channel <- event
 					log.Printf("Send event to client %s ", client.ID)
