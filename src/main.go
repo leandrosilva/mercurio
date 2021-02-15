@@ -12,8 +12,13 @@ import (
 )
 
 func main() {
-	broker := NewBroker()
+	database := ConnectSqliteDatabase("./db/mercurio.db", true)
+	repository, err := NewSQLNotificationRepository(database)
+	if err != nil {
+		panic("failed to create notification repository on top of an SQLite database")
+	}
 
+	broker := NewBroker(repository)
 	api := NewNotificationAPI(broker)
 
 	router := mux.NewRouter()

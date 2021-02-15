@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrNotificationNotFound is returned when, guess what, a notification doesn't exist in database
+var ErrNotificationNotFound = errors.New("notification not found")
 
 // Notification is the persistent record of a known event (read/unread)
 type Notification struct {
@@ -54,4 +58,17 @@ type BroadcastEvent struct {
 type Client struct {
 	ID      string
 	Channel chan Notification
+}
+
+// NotificationRepository is the interface to notification datastore
+type NotificationRepository interface {
+	Add(notification *Notification) error
+	Update(notification *Notification) error
+	Delete(id uint) error
+	Get(id uint) (Notification, error)
+	GetAll() ([]Notification, error)
+	GetByStatus(read bool) ([]Notification, error)
+	GetByEventID(eventID string) ([]Notification, error)
+	GetBySourceID(sourceID string) ([]Notification, error)
+	GetByDestinationID(destinationID string) ([]Notification, error)
 }
