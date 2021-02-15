@@ -7,7 +7,7 @@ import (
 // Broker is the core notification service entity
 type Broker struct {
 	// Events are pushed to this channel by the main events-gathering routine
-	notifications chan Event
+	notifications chan Notification
 
 	// New client connections
 	newClients chan Client
@@ -22,7 +22,7 @@ type Broker struct {
 // NewBroker creates a new Broker and puts it to run
 func NewBroker() (broker *Broker) {
 	broker = &Broker{
-		notifications:  make(chan Event, 1),
+		notifications:  make(chan Notification, 1),
 		newClients:     make(chan Client),
 		closingClients: make(chan Client),
 		clients:        make(map[string]Client),
@@ -47,12 +47,12 @@ func (broker *Broker) Run() {
 				delete(broker.clients, c.ID)
 				log.Printf("Removed client. (%d registered clients)", len(broker.clients))
 
-			case event := <-broker.notifications:
+			case notification := <-broker.notifications:
 				// We got a new event from the outside!
 				// Send event to the target client
-				client, exists := broker.clients[event.DestinationID]
+				client, exists := broker.clients[notification.DestinationID]
 				if exists {
-					client.Channel <- event
+					client.Channel <- notification
 					log.Printf("Send event to client %s ", client.ID)
 				}
 			}
@@ -70,8 +70,38 @@ func (broker *Broker) NotifyClientDisconnected(client Client) {
 	broker.closingClients <- client
 }
 
-// NotifyEvent when an event has occourred
-func (broker *Broker) NotifyEvent(event Event) {
+// NotifyEvent when an event has occourred for one destination
+func (broker *Broker) NotifyEvent(event Event) (*Notification, error) {
+	notification, err := NewNotification(&event)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: save event before notify it has happened
-	broker.notifications <- event
+	broker.notifications <- *notification
+
+	return notification, nil
+}
+
+// BroadcastEvent when an event has occourred for many destinations
+func (broker *Broker) BroadcastEvent(broadcastEvent BroadcastEvent) ([]*Notification, error) {
+	notifications := []*Notification{}
+
+	for _, destinationID := range broadcastEvent.Destinations {
+		event := Event{
+			ID:            broadcastEvent.ID,
+			SourceID:      broadcastEvent.SourceID,
+			DestinationID: destinationID,
+			Data:          broadcastEvent.Data,
+		}
+
+		notification, err := broker.NotifyEvent(event)
+		if err != nil {
+			return nil, err
+		}
+
+		notifications = append(notifications, notification)
+	}
+
+	return notifications, nil
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -23,8 +22,9 @@ func NewNotificationAPI(broker *Broker) (api NotificationAPI) {
 	return
 }
 
-type newEventResponse struct {
-	EventID string `json:"eventID"`
+type notifyEventResponse struct {
+	NotificationID uint   `json:"notificationID"`
+	EventID        string `json:"eventID"`
 }
 
 // NotifyEventHandler is the endpoint to publishs events from source to destination
@@ -38,24 +38,32 @@ func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	event.ID = fmt.Sprint(time.Now().Unix())
-
 	log.Printf("Receiving event for client %s from source %s", event.DestinationID, event.SourceID)
-	api.Broker.NotifyEvent(event)
+
+	notification, err := api.Broker.NotifyEvent(event)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := newEventResponse{
-		EventID: event.ID,
+	response := notifyEventResponse{
+		NotificationID: notification.ID,
+		EventID:        notification.EventID,
 	}
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+type broadEventResponse struct {
+	Notifications []uint   `json:"notificationID"`
+	Events        []string `json:"eventID"`
+}
+
 // BrodcastEventHandler is the endpoint to publishs events from source to many destinations
 func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.Request) {
-	var brodcastEvent BrodcastEvent
+	var brodcastEvent BroadcastEvent
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&brodcastEvent)
@@ -64,35 +72,32 @@ func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	brodcastEvent.ID = fmt.Sprint(time.Now().Unix())
-
 	log.Printf("Receiving event to broadcast from source %s to %s destinations", brodcastEvent.SourceID, brodcastEvent.Destinations)
 
-	for _, destinationID := range brodcastEvent.Destinations {
-		event := Event{
-			ID:            brodcastEvent.ID,
-			SourceID:      brodcastEvent.SourceID,
-			DestinationID: destinationID,
-			Data:          brodcastEvent.Data,
-		}
-		api.Broker.NotifyEvent(event)
+	notifications, err := api.Broker.BroadcastEvent(brodcastEvent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := newEventResponse{
-		EventID: brodcastEvent.ID,
+	response := broadEventResponse{}
+	for _, notification := range notifications {
+		response.Notifications = append(response.Notifications, notification.ID)
+		response.Events = append(response.Events, notification.EventID)
 	}
+
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type streamNotificationsResponse struct {
-	EventID  string `json:"eventID,omitempty"`
-	SourceID string `json:"sourceID,omitempty"`
-	ClientID string `json:"clientID,omitempty"`
-	Content  string `json:"data,omitempty"`
+	NotificationID uint   `json:"notificationID,omitempty"`
+	EventID        string `json:"eventID,omitempty"`
+	SourceID       string `json:"sourceID,omitempty"`
+	ClientID       string `json:"clientID,omitempty"`
+	Content        string `json:"data,omitempty"`
 }
 
 // StreamNotificationsHandler is the endpoint for clients listening for notifications
@@ -113,7 +118,7 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 	// Registers client connection with the Broker
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	clientChan := make(chan Event)
+	clientChan := make(chan Notification)
 
 	client := Client{
 		ID:      clientID,
@@ -136,14 +141,15 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 
 	for {
 		// Get event for client
-		event := <-clientChan
+		notification := <-clientChan
 
 		// Encode the event
 		response := streamNotificationsResponse{
-			EventID:  event.ID,
-			SourceID: event.SourceID,
-			ClientID: event.DestinationID,
-			Content:  event.Data,
+			NotificationID: notification.ID,
+			EventID:        notification.EventID,
+			SourceID:       notification.SourceID,
+			ClientID:       notification.DestinationID,
+			Content:        notification.Data,
 		}
 		jsonResponse, err := json.Marshal(&response)
 		if err != nil {
