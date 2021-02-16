@@ -7,9 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrNotificationNotFound is returned when, guess what, a notification doesn't exist in database
-var ErrNotificationNotFound = errors.New("notification not found")
-
 // Notification is the persistent record of a known event (read/unread)
 type Notification struct {
 	ID            uint       `json:"id,omitempty" gorm:"primaryKey"`
@@ -60,6 +57,20 @@ type Client struct {
 	Channel chan Notification
 }
 
+var (
+	// StatusAllNotifications stands for all notifications of a destination / client
+	StatusAllNotifications = 0
+
+	// StatusUnreadNotifications stands for yet unread notifications of a destination / client
+	StatusUnreadNotifications = 1
+
+	// StatusReadNotifications stands for already read notifications of a destination / client
+	StatusReadNotifications = 2
+)
+
+// ErrNotificationNotFound is returned when, guess what, a notification doesn't exist in database
+var ErrNotificationNotFound = errors.New("notification not found")
+
 // NotificationRepository is the interface to notification datastore
 type NotificationRepository interface {
 	Add(notification *Notification) error
@@ -67,6 +78,6 @@ type NotificationRepository interface {
 	Delete(destinationID string, id uint) error
 	Get(destinationID string, id uint) (Notification, error)
 	GetAll(destinationID string) ([]Notification, error)
-	GetByStatus(destinationID string, read bool) ([]Notification, error)
+	GetByStatus(destinationID string, status int) ([]Notification, error)
 	FilterBy(destinationID string, criteria Notification) ([]Notification, error)
 }

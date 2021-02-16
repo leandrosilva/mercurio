@@ -75,11 +75,14 @@ func (repository *SQLNotificationRepository) GetAll(destinationID string) ([]Not
 	return notifications, nil
 }
 
-// GetByStatus the notifications in the SQL database by its status (read/unread)
-func (repository *SQLNotificationRepository) GetByStatus(destinationID string, read bool) ([]Notification, error) {
-	criteria := "destination_id = ? AND read_at IS NULL"
-	if read {
-		criteria = "destination_id = ? AND read_at IS NOT NULL"
+// GetByStatus the notifications in the SQL database by its status (read/unread/all)
+func (repository *SQLNotificationRepository) GetByStatus(destinationID string, status int) ([]Notification, error) {
+	criteria := "destination_id = ?"
+	if status == StatusUnreadNotifications {
+		criteria += " AND read_at IS NULL"
+	}
+	if status == StatusReadNotifications {
+		criteria += " AND read_at IS NOT NULL"
 	}
 
 	var notifications []Notification

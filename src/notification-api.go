@@ -185,11 +185,25 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
 
+	// Optional query strings
+	status := r.FormValue("status")
+	if status != "" && status != "unread" && status != "read" {
+		http.Error(w, fmt.Sprintf("%s is not a valid status", status), http.StatusBadRequest)
+		return
+	}
+	statusCriteria := StatusAllNotifications
+	if status == "unread" {
+		statusCriteria = StatusUnreadNotifications
+	}
+	if status == "read" {
+		statusCriteria = StatusReadNotifications
+	}
+
 	log.Printf("Getting notifications of client %s", clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
-	notifications, err := api.Repository.GetAll(clientID)
+	notifications, err := api.Repository.GetByStatus(clientID, statusCriteria)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -229,11 +243,7 @@ type notificationResponse struct {
 func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	notificationID, err := strconv.Atoi(vars["notificationID"])
-	if err != nil {
-		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
-		return
-	}
+	notificationID, _ := strconv.Atoi(vars["notificationID"])
 
 	log.Printf("Getting notification %d of client %s", notificationID, clientID)
 
@@ -271,11 +281,7 @@ type changeNotificationStatusResponse struct {
 func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	notificationID, err := strconv.Atoi(vars["notificationID"])
-	if err != nil {
-		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
-		return
-	}
+	notificationID, _ := strconv.Atoi(vars["notificationID"])
 
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
@@ -313,11 +319,7 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	notificationID, err := strconv.Atoi(vars["notificationID"])
-	if err != nil {
-		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
-		return
-	}
+	notificationID, _ := strconv.Atoi(vars["notificationID"])
 
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {

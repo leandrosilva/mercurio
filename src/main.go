@@ -26,9 +26,9 @@ func main() {
 	router.HandleFunc("/api/events/broadcast", api.BroadcastEventHandler).Methods("POST")
 	router.HandleFunc("/api/clients/{clientID}/notifications/stream", api.StreamNotificationsHandler)
 	router.HandleFunc("/api/clients/{clientID}/notifications", api.GetNotificationsHandler)
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID}", api.GetNotificationHandler)
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID}/read", api.MarkNotificationReadHandler).Methods("PUT")
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
+	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}", api.GetNotificationHandler)
+	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}/read", api.MarkNotificationReadHandler).Methods("PUT")
+	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
 
 	server := &http.Server{
 		Addr:    "127.0.0.1:8000",
