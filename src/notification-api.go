@@ -187,23 +187,16 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 
 	// Optional query strings
 	status := r.FormValue("status")
-	if status != "" && status != "unread" && status != "read" {
+	if !IsValidNotificationStatus(status) {
 		http.Error(w, fmt.Sprintf("%s is not a valid status", status), http.StatusBadRequest)
 		return
-	}
-	statusCriteria := StatusAllNotifications
-	if status == "unread" {
-		statusCriteria = StatusUnreadNotifications
-	}
-	if status == "read" {
-		statusCriteria = StatusReadNotifications
 	}
 
 	log.Printf("Getting notifications of client %s", clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
-	notifications, err := api.Repository.GetByStatus(clientID, statusCriteria)
+	notifications, err := api.Repository.GetByStatus(clientID, status)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

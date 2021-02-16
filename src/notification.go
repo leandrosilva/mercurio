@@ -59,14 +59,19 @@ type Client struct {
 
 var (
 	// StatusAllNotifications stands for all notifications of a destination / client
-	StatusAllNotifications = 0
+	StatusAllNotifications = "all"
 
 	// StatusUnreadNotifications stands for yet unread notifications of a destination / client
-	StatusUnreadNotifications = 1
+	StatusUnreadNotifications = "unread"
 
 	// StatusReadNotifications stands for already read notifications of a destination / client
-	StatusReadNotifications = 2
+	StatusReadNotifications = "read"
 )
+
+// IsValidNotificationStatus tells whether a given status string is a valid one
+func IsValidNotificationStatus(status string) bool {
+	return status == "" || status == StatusAllNotifications || status == StatusUnreadNotifications || status == StatusReadNotifications
+}
 
 // ErrNotificationNotFound is returned when, guess what, a notification doesn't exist in database
 var ErrNotificationNotFound = errors.New("notification not found")
@@ -78,6 +83,6 @@ type NotificationRepository interface {
 	Delete(destinationID string, id uint) error
 	Get(destinationID string, id uint) (Notification, error)
 	GetAll(destinationID string) ([]Notification, error)
-	GetByStatus(destinationID string, status int) ([]Notification, error)
+	GetByStatus(destinationID string, status string) ([]Notification, error)
 	FilterBy(destinationID string, criteria Notification) ([]Notification, error)
 }
