@@ -344,32 +344,3 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 		respondWithInternalServerError(w, err.Error())
 	}
 }
-
-// HTTP Helpers
-//
-
-func respondWithError(w http.ResponseWriter, message string, httpStatus int) {
-	response := make(map[string]string)
-	response["message"] = message
-
-	content, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(httpStatus)
-	w.Write(content)
-}
-
-func respondWithNotFound(w http.ResponseWriter, message string) {
-	respondWithError(w, message, http.StatusNotFound)
-}
-
-func respondWithBadRequest(w http.ResponseWriter, message string) {
-	respondWithError(w, message, http.StatusBadRequest)
-}
-
-func respondWithInternalServerError(w http.ResponseWriter, message string) {
-	respondWithError(w, message, http.StatusInternalServerError)
-}

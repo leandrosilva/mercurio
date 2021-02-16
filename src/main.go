@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,30 +10,68 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
+	"github.com/urfave/negroni"
 )
 
 func main() {
+	// Basic underlying setup
+	//
+
+	jwtAuth, err := NewJWTAuthMiddleware()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create JWT Auth Middleware due to: %s", err.Error()))
+	}
+
 	database := ConnectSqliteDatabase("./db/mercurio.db", true)
 	repository, err := NewSQLNotificationRepository(database)
 	if err != nil {
-		panic("failed to create notification repository on top of an SQLite database")
+		panic(fmt.Sprintf("failed to create notification repository on top of an SQLite database due to: %s", err.Error()))
 	}
 
 	broker := NewBroker(repository)
 	api := NewNotificationAPI(broker, repository)
 
-	router := mux.NewRouter()
-	router.HandleFunc("/api/events/unicast", api.UnicastEventHandler).Methods("POST")
-	router.HandleFunc("/api/events/broadcast", api.BroadcastEventHandler).Methods("POST")
-	router.HandleFunc("/api/clients/{clientID}/notifications/stream", api.StreamNotificationsHandler)
-	router.HandleFunc("/api/clients/{clientID}/notifications", api.GetNotificationsHandler)
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}", api.GetNotificationHandler)
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}/read", api.MarkNotificationReadHandler).Methods("PUT")
-	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID:[0-9]+}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
+	// HTTP Routing
+	//
+
+	r := mux.NewRouter()
+
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		content := map[string]string{"message": "Welcome to Mercurio"}
+		respondWithSuccess(w, content)
+	})
+
+	eventsRouter := r.PathPrefix("/api/events").Subrouter()
+	eventsRouter.Handle("/unicast", jwtAuth.Secure(api.UnicastEventHandler)).Methods("POST")
+	eventsRouter.Handle("/broadcast", jwtAuth.Secure(api.BroadcastEventHandler)).Methods("POST")
+
+	clientsRouter := r.PathPrefix("/api/clients/{clientID}").Subrouter()
+	clientsRouter.Handle("/notifications/stream", jwtAuth.Secure(api.StreamNotificationsHandler))
+	clientsRouter.Handle("/notifications", jwtAuth.Secure(api.GetNotificationsHandler))
+	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}", jwtAuth.Secure(api.GetNotificationHandler))
+	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}/read", jwtAuth.Secure(api.MarkNotificationReadHandler)).Methods("PUT")
+	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}/unread", jwtAuth.Secure(api.MarkNotificationUnreadHandler)).Methods("PUT")
+
+	// CORS
+	//
+
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"},
+	})
+
+	// HTTP Server Setup & Boot
+	//
+
+	n := negroni.Classic()
+	n.Use(c)
+	n.UseHandler(r)
 
 	server := &http.Server{
 		Addr:    "127.0.0.1:8000",
-		Handler: router,
+		Handler: n,
 	}
 
 	// Spawns server on a goroutine in order to not block the flow

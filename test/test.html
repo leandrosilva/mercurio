@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <script src="eventsource.js"></script>
+</head>
+<body>
+    <script>
+        var EventSource = window.EventSourcePolyfill;
+
+        var validToken = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzIiwibmFtZSI6IlVzZXIgT25lLVR3by1UaHJlZSIsImlhdCI6MTUxNjIzOTAyMn0.VOCXaMknw5CG002hh1iSZGvdI-ug76F1GbSYRVu_RuU";
+        var invalidToken = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNDU2IiwibmFtZSI6IlVzZXIgRm91ci1GaXZlLVNpeCIsImlhdCI6MTUxNjIzOTAyMn0.lOtKhdN4fWx_s4eLaAT7OXDOBHIwMUhbBj7u35lJGrI";
+
+        var client = new EventSource("http://localhost:8000/api/clients/123/notifications/stream", {
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-store",
+                "Authorization": validToken
+            }
+        });
+        client.onmessage = function (msg) {
+            console.log(JSON.parse(msg.data))
+        };
+    </script>
+</body>
+</html>
