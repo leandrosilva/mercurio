@@ -62,13 +62,13 @@ func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
-type broadEventResponse struct {
-	Notifications []uint   `json:"notificationID"`
-	Events        []string `json:"eventID"`
+type broadcastEventResponse struct {
+	NotificationID uint   `json:"notificationID"`
+	EventID        string `json:"eventID"`
 }
 
-// BrodcastEventHandler is the endpoint to publishs events from source to many destinations
-func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.Request) {
+// BroadcastEventHandler is the endpoint to publishs events from source to many destinations
+func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http.Request) {
 	var brodcastEvent BroadcastEvent
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -88,10 +88,12 @@ func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := broadEventResponse{}
+	response := []broadcastEventResponse{}
 	for _, notification := range notifications {
-		response.Notifications = append(response.Notifications, notification.ID)
-		response.Events = append(response.Events, notification.EventID)
+		response = append(response, broadcastEventResponse{
+			NotificationID: notification.ID,
+			EventID:        notification.EventID,
+		})
 	}
 
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
@@ -175,7 +177,7 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 
 type notificationsResponse struct {
 	ClientID      string                 `json:"clientID,omitempty"`
-	Notifications []notificationResponse `json:"events"`
+	Notifications []notificationResponse `json:"notifications"`
 }
 
 // GetNotificationsHandler responds with notifications owned by a given client

@@ -23,7 +23,7 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/events/notify", api.NotifyEventHandler).Methods("POST")
-	router.HandleFunc("/api/events/broadcast", api.BrodcastEventHandler).Methods("POST")
+	router.HandleFunc("/api/events/broadcast", api.BroadcastEventHandler).Methods("POST")
 	router.HandleFunc("/api/clients/{clientID}/notifications/stream", api.StreamNotificationsHandler)
 	router.HandleFunc("/api/clients/{clientID}/notifications", api.GetNotificationsHandler)
 	router.HandleFunc("/api/clients/{clientID}/notifications/{notificationID}", api.GetNotificationHandler)
