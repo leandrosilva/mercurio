@@ -64,11 +64,9 @@ type Client struct {
 type NotificationRepository interface {
 	Add(notification *Notification) error
 	Update(notification *Notification) error
-	Delete(id uint) error
-	Get(id uint) (Notification, error)
-	GetAll() ([]Notification, error)
-	GetByStatus(read bool) ([]Notification, error)
-	GetByEventID(eventID string) ([]Notification, error)
-	GetBySourceID(sourceID string) ([]Notification, error)
-	GetByDestinationID(destinationID string) ([]Notification, error)
+	Delete(destinationID string, id uint) error
+	Get(destinationID string, id uint) (Notification, error)
+	GetAll(destinationID string) ([]Notification, error)
+	GetByStatus(destinationID string, read bool) ([]Notification, error)
+	FilterBy(destinationID string, criteria Notification) ([]Notification, error)
 }

@@ -41,8 +41,8 @@ func (repository *SQLNotificationRepository) Update(notification *Notification) 
 }
 
 // Delete a notification in the SQL database
-func (repository *SQLNotificationRepository) Delete(id uint) error {
-	result := repository.db.Delete(&Notification{}, id)
+func (repository *SQLNotificationRepository) Delete(destinationID string, id uint) error {
+	result := repository.db.Delete(&Notification{DestinationID: destinationID}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -51,9 +51,9 @@ func (repository *SQLNotificationRepository) Delete(id uint) error {
 }
 
 // Get a notification in the SQL database by its ID
-func (repository *SQLNotificationRepository) Get(id uint) (Notification, error) {
+func (repository *SQLNotificationRepository) Get(destinationID string, id uint) (Notification, error) {
 	var notification Notification
-	result := repository.db.First(&notification, id)
+	result := repository.db.Where(&Notification{ID: id, DestinationID: destinationID}).First(&notification)
 	if err := result.Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return Notification{}, ErrNotificationNotFound
@@ -65,9 +65,9 @@ func (repository *SQLNotificationRepository) Get(id uint) (Notification, error) 
 }
 
 // GetAll the notifications in the SQL database
-func (repository *SQLNotificationRepository) GetAll() ([]Notification, error) {
+func (repository *SQLNotificationRepository) GetAll(destinationID string) ([]Notification, error) {
 	var notifications []Notification
-	result := repository.db.Find(&notifications)
+	result := repository.db.Where(&Notification{DestinationID: destinationID}).Find(&notifications)
 	if result.Error != nil {
 		return []Notification{}, result.Error
 	}
@@ -76,14 +76,14 @@ func (repository *SQLNotificationRepository) GetAll() ([]Notification, error) {
 }
 
 // GetByStatus the notifications in the SQL database by its status (read/unread)
-func (repository *SQLNotificationRepository) GetByStatus(read bool) ([]Notification, error) {
-	criteria := "read_at is null"
+func (repository *SQLNotificationRepository) GetByStatus(destinationID string, read bool) ([]Notification, error) {
+	criteria := "destination_id = ? AND read_at IS NULL"
 	if read {
-		criteria = "read_at is not null"
+		criteria = "destination_id = ? AND read_at IS NOT NULL"
 	}
 
 	var notifications []Notification
-	result := repository.db.Where(criteria).Find(&notifications)
+	result := repository.db.Where(criteria, destinationID).Find(&notifications)
 	if result.Error != nil {
 		return []Notification{}, result.Error
 	}
@@ -91,23 +91,10 @@ func (repository *SQLNotificationRepository) GetByStatus(read bool) ([]Notificat
 	return notifications, nil
 }
 
-// GetByEventID the notifications in the SQL database by its event ID
-func (repository *SQLNotificationRepository) GetByEventID(eventID string) ([]Notification, error) {
-	return repository.getBy(Notification{EventID: eventID})
-}
+// FilterBy all notifications in the SQL database by given criteria
+func (repository *SQLNotificationRepository) FilterBy(destinationID string, criteria Notification) ([]Notification, error) {
+	criteria.DestinationID = destinationID
 
-// GetBySourceID the notifications in the SQL database by its source ID
-func (repository *SQLNotificationRepository) GetBySourceID(sourceID string) ([]Notification, error) {
-	return repository.getBy(Notification{SourceID: sourceID})
-}
-
-// GetByDestinationID the notifications in the SQL database by its source ID
-func (repository *SQLNotificationRepository) GetByDestinationID(destinationID string) ([]Notification, error) {
-	return repository.getBy(Notification{SourceID: destinationID})
-}
-
-// Gets a number of notifications in the SQL database by given criteria
-func (repository *SQLNotificationRepository) getBy(criteria Notification) ([]Notification, error) {
 	var notifications []Notification
 	result := repository.db.Where(&criteria).Find(&notifications)
 	if result.Error != nil {

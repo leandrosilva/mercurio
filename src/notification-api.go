@@ -187,7 +187,7 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "application/json")
 
-	notifications, err := api.Repository.GetAll()
+	notifications, err := api.Repository.GetAll(clientID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -237,7 +237,7 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 
 	w.Header().Set("Content-Type", "application/json")
 
-	notification, err := api.Repository.Get(uint(notificationID))
+	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -275,7 +275,7 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 		return
 	}
 
-	notification, err := api.Repository.Get(uint(notificationID))
+	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -317,7 +317,7 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 		return
 	}
 
-	notification, err := api.Repository.Get(uint(notificationID))
+	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
