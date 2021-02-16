@@ -19,16 +19,16 @@ func main() {
 	}
 
 	broker := NewBroker(repository)
-	api := NewNotificationAPI(broker)
+	api := NewNotificationAPI(broker, repository)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/notify", api.NotifyEventHandler).Methods("POST")
 	router.HandleFunc("/broadcast", api.BrodcastEventHandler).Methods("POST")
-	router.HandleFunc("/notifications/{clientID}/stream", api.StreamNotificationsHandler)
-	router.HandleFunc("/notifications/{clientID}", api.GetNotificationsHandler)
-	router.HandleFunc("/notifications/{clientID}/{eventID}", api.GetNotificationHandler)
-	router.HandleFunc("/notifications/{clientID}/{eventID}/read", api.MarkNotificationReadHandler).Methods("PUT")
-	router.HandleFunc("/notifications/{clientID}/{eventID}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
+	router.HandleFunc("/client/{clientID}/notifications/stream", api.StreamNotificationsHandler)
+	router.HandleFunc("/client/{clientID}/notifications", api.GetNotificationsHandler)
+	router.HandleFunc("/client/{clientID}/notifications/{notificationID}", api.GetNotificationHandler)
+	router.HandleFunc("/client/{clientID}/notifications/{notificationID}/read", api.MarkNotificationReadHandler).Methods("PUT")
+	router.HandleFunc("/client/{clientID}/notifications/{notificationID}/unread", api.MarkNotificationUnreadHandler).Methods("PUT")
 
 	server := &http.Server{
 		Addr:    "127.0.0.1:8000",

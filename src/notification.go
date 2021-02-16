@@ -12,13 +12,13 @@ var ErrNotificationNotFound = errors.New("notification not found")
 
 // Notification is the persistent record of a known event (read/unread)
 type Notification struct {
-	ID            uint      `json:"id,omitempty" gorm:"primaryKey"`
-	EventID       string    `json:"event,omitempty" gorm:"index"`
-	SourceID      string    `json:"sourceID,omitempty" gorm:"index"`
-	DestinationID string    `json:"destinationID,omitempty" gorm:"index"`
-	Data          string    `json:"data,omitempty"`
-	CreatedAt     time.Time `json:"createdAt,omitempty"`
-	ReadAt        time.Time `json:"readAt,omitempty"`
+	ID            uint       `json:"id,omitempty" gorm:"primaryKey"`
+	EventID       string     `json:"event,omitempty" gorm:"not null;index"`
+	SourceID      string     `json:"sourceID,omitempty" gorm:"not null;index"`
+	DestinationID string     `json:"destinationID,omitempty" gorm:"not null;index"`
+	Data          string     `json:"data,omitempty" gorm:"not null"`
+	CreatedAt     time.Time  `json:"createdAt,omitempty"`
+	ReadAt        *time.Time `json:"readAt,omitempty"`
 }
 
 // NewNotification creates a new notification for a given event

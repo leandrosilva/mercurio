@@ -2,22 +2,27 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 // NotificationAPI is the public HTTP interface for the Broker
 type NotificationAPI struct {
-	Broker Broker
+	Broker     *Broker
+	Repository NotificationRepository
 }
 
 // NewNotificationAPI creates an instance of the NotificationAPI
-func NewNotificationAPI(broker *Broker) (api NotificationAPI) {
+func NewNotificationAPI(broker *Broker, repository NotificationRepository) (api NotificationAPI) {
 	api = NotificationAPI{
-		Broker: *broker,
+		Broker:     broker,
+		Repository: repository,
 	}
 	return
 }
@@ -43,6 +48,7 @@ func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Re
 	notification, err := api.Broker.NotifyEvent(event)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -77,6 +83,7 @@ func (api *NotificationAPI) BrodcastEventHandler(w http.ResponseWriter, r *http.
 	notifications, err := api.Broker.BroadcastEvent(brodcastEvent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -97,7 +104,7 @@ type streamNotificationsResponse struct {
 	EventID        string `json:"eventID,omitempty"`
 	SourceID       string `json:"sourceID,omitempty"`
 	ClientID       string `json:"clientID,omitempty"`
-	Content        string `json:"data,omitempty"`
+	Data           string `json:"data,omitempty"`
 }
 
 // StreamNotificationsHandler is the endpoint for clients listening for notifications
@@ -149,11 +156,12 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 			EventID:        notification.EventID,
 			SourceID:       notification.SourceID,
 			ClientID:       notification.DestinationID,
-			Content:        notification.Data,
+			Data:           notification.Data,
 		}
 		jsonResponse, err := json.Marshal(&response)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		// Send it
@@ -166,8 +174,8 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 }
 
 type notificationsResponse struct {
-	ClientID string  `json:"clientID,omitempty"`
-	Events   []Event `json:"events"`
+	ClientID      string                 `json:"clientID,omitempty"`
+	Notifications []notificationResponse `json:"events"`
 }
 
 // GetNotificationsHandler responds with notifications owned by a given client
@@ -179,46 +187,75 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := notificationsResponse{
-		ClientID: clientID,
-		Events: []Event{
-			{
-				ID:            "666",
-				SourceID:      "stub",
-				DestinationID: clientID,
-				Data:          "stub stuff",
-			},
-		},
+	notifications, err := api.Repository.GetAll()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	response := notificationsResponse{
+		ClientID:      clientID,
+		Notifications: []notificationResponse{},
+	}
+	for _, notification := range notifications {
+		response.Notifications = append(response.Notifications, notificationResponse{
+			NotificationID: notification.ID,
+			EventID:        notification.EventID,
+			SourceID:       notification.SourceID,
+			Data:           notification.Data,
+			CreatedAt:      notification.CreatedAt,
+			ReadAt:         notification.ReadAt,
+		})
+	}
+
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type notificationResponse struct {
-	ClientID string `json:"clientID,omitempty"`
-	Event    Event  `json:"event,omitempty"`
+	NotificationID uint       `json:"notificationID,omitempty"`
+	EventID        string     `json:"eventID,omitempty"`
+	SourceID       string     `json:"sourceID,omitempty"`
+	ClientID       string     `json:"clientID,omitempty"`
+	Data           string     `json:"data,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt,omitempty"`
+	ReadAt         *time.Time `json:"readAt,omitempty"`
 }
 
 // GetNotificationHandler responds with a event notification by its id
 func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	eventID := vars["eventID"]
+	notificationID, err := strconv.Atoi(vars["notificationID"])
+	if err != nil {
+		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
+		return
+	}
 
-	log.Printf("Getting notification %s of client %s", eventID, clientID)
+	log.Printf("Getting notification %d of client %s", notificationID, clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := notificationResponse{
-		ClientID: clientID,
-		Event: Event{
-			ID:            "666",
-			SourceID:      "stub",
-			DestinationID: clientID,
-			Data:          "stub stuff",
-		},
+	notification, err := api.Repository.Get(uint(notificationID))
+	if err != nil {
+		if errors.Is(err, ErrNotificationNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	response := notificationResponse{
+		NotificationID: notification.ID,
+		EventID:        notification.EventID,
+		SourceID:       notification.SourceID,
+		Data:           notification.Data,
+		CreatedAt:      notification.CreatedAt,
+		ReadAt:         notification.ReadAt,
+	}
+
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -232,9 +269,33 @@ type changeNotificationStatusResponse struct {
 func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	eventID := vars["eventID"]
+	notificationID, err := strconv.Atoi(vars["notificationID"])
+	if err != nil {
+		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
+		return
+	}
 
-	log.Printf("Marking notification %s of client %s as read", eventID, clientID)
+	notification, err := api.Repository.Get(uint(notificationID))
+	if err != nil {
+		if errors.Is(err, ErrNotificationNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// A read notification is simply one that has a read time
+	readAt := time.Now()
+	notification.ReadAt = &readAt
+
+	err = api.Repository.Update(&notification)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Marking notification %d of client %s as read", notificationID, clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -250,9 +311,32 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clientID := vars["clientID"]
-	eventID := vars["eventID"]
+	notificationID, err := strconv.Atoi(vars["notificationID"])
+	if err != nil {
+		http.Error(w, "notificationID not in a valid format", http.StatusBadRequest)
+		return
+	}
 
-	log.Printf("Marking notification %s of client %s as unread", eventID, clientID)
+	notification, err := api.Repository.Get(uint(notificationID))
+	if err != nil {
+		if errors.Is(err, ErrNotificationNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// A read notification is simply one that does not have a read time
+	notification.ReadAt = nil
+
+	err = api.Repository.Update(&notification)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Marking notification %d of client %s as unread", notificationID, clientID)
 
 	w.Header().Set("Content-Type", "application/json")
 
