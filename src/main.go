@@ -22,7 +22,7 @@ func main() {
 	api := NewNotificationAPI(broker, repository)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/events/notify", api.NotifyEventHandler).Methods("POST")
+	router.HandleFunc("/api/events/unicast", api.UnicastEventHandler).Methods("POST")
 	router.HandleFunc("/api/events/broadcast", api.BroadcastEventHandler).Methods("POST")
 	router.HandleFunc("/api/clients/{clientID}/notifications/stream", api.StreamNotificationsHandler)
 	router.HandleFunc("/api/clients/{clientID}/notifications", api.GetNotificationsHandler)

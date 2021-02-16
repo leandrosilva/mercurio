@@ -27,13 +27,13 @@ func NewNotificationAPI(broker *Broker, repository NotificationRepository) (api 
 	return
 }
 
-type notifyEventResponse struct {
+type unicastEventResponse struct {
 	NotificationID uint   `json:"notificationID"`
 	EventID        string `json:"eventID"`
 }
 
-// NotifyEventHandler is the endpoint to publishs events from source to destination
-func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Request) {
+// UnicastEventHandler is the endpoint to publishs events from one source to one destination
+func (api *NotificationAPI) UnicastEventHandler(w http.ResponseWriter, r *http.Request) {
 	var event Event
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -53,7 +53,7 @@ func (api *NotificationAPI) NotifyEventHandler(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 
-	response := notifyEventResponse{
+	response := unicastEventResponse{
 		NotificationID: notification.ID,
 		EventID:        notification.EventID,
 	}
@@ -67,7 +67,7 @@ type broadcastEventResponse struct {
 	EventID        string `json:"eventID"`
 }
 
-// BroadcastEventHandler is the endpoint to publishs events from source to many destinations
+// BroadcastEventHandler is the endpoint to publishs events from one source to many destinations
 func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http.Request) {
 	var brodcastEvent BroadcastEvent
 	decoder := json.NewDecoder(r.Body)
