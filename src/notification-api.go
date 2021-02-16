@@ -39,7 +39,7 @@ func (api *NotificationAPI) UnicastEventHandler(w http.ResponseWriter, r *http.R
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&event)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondWithBadRequest(w, err.Error())
 		return
 	}
 
@@ -47,7 +47,7 @@ func (api *NotificationAPI) UnicastEventHandler(w http.ResponseWriter, r *http.R
 
 	notification, err := api.Broker.NotifyEvent(event)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -58,7 +58,7 @@ func (api *NotificationAPI) UnicastEventHandler(w http.ResponseWriter, r *http.R
 		EventID:        notification.EventID,
 	}
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 	}
 }
 
@@ -74,7 +74,7 @@ func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&brodcastEvent)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondWithBadRequest(w, err.Error())
 		return
 	}
 
@@ -82,7 +82,7 @@ func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http
 
 	notifications, err := api.Broker.BroadcastEvent(brodcastEvent)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -97,7 +97,7 @@ func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http
 	}
 
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 	}
 }
 
@@ -114,7 +114,7 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 	// Checks if SSE is possible
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming is unsupported.", http.StatusInternalServerError)
+		respondWithInternalServerError(w, "Streaming is unsupported.")
 		return
 	}
 
@@ -162,7 +162,7 @@ func (api *NotificationAPI) StreamNotificationsHandler(w http.ResponseWriter, r 
 		}
 		jsonResponse, err := json.Marshal(&response)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondWithInternalServerError(w, err.Error())
 			return
 		}
 
@@ -188,7 +188,7 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 	// Optional query strings
 	status := r.FormValue("status")
 	if !IsValidNotificationStatus(status) {
-		http.Error(w, fmt.Sprintf("%s is not a valid status", status), http.StatusBadRequest)
+		respondWithBadRequest(w, fmt.Sprintf("%s is not a valid status", status))
 		return
 	}
 
@@ -198,7 +198,7 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 
 	notifications, err := api.Repository.GetByStatus(clientID, status)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -218,7 +218,7 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 	}
 
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 	}
 }
 
@@ -245,10 +245,10 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			respondWithNotFound(w, err.Error())
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -262,7 +262,7 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 	}
 
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 	}
 }
 
@@ -279,10 +279,10 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			respondWithNotFound(w, err.Error())
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -292,7 +292,7 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 
 	err = api.Repository.Update(&notification)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -304,7 +304,7 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 		Status: "read",
 	}
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 	}
 }
 
@@ -317,10 +317,10 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			respondWithNotFound(w, err.Error())
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -329,7 +329,7 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 
 	err = api.Repository.Update(&notification)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondWithInternalServerError(w, err.Error())
 		return
 	}
 
@@ -341,6 +341,35 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 		Status: "unread",
 	}
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
+		respondWithInternalServerError(w, err.Error())
+	}
+}
+
+// HTTP Helpers
+//
+
+func respondWithError(w http.ResponseWriter, message string, httpStatus int) {
+	response := make(map[string]string)
+	response["message"] = message
+
+	content, err := json.Marshal(response)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	w.Write(content)
+}
+
+func respondWithNotFound(w http.ResponseWriter, message string) {
+	respondWithError(w, message, http.StatusNotFound)
+}
+
+func respondWithBadRequest(w http.ResponseWriter, message string) {
+	respondWithError(w, message, http.StatusBadRequest)
+}
+
+func respondWithInternalServerError(w http.ResponseWriter, message string) {
+	respondWithError(w, message, http.StatusInternalServerError)
 }
