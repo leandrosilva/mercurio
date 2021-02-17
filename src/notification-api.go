@@ -194,8 +194,6 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 
 	log.Printf("Getting notifications of client %s", clientID)
 
-	w.Header().Set("Content-Type", "application/json")
-
 	notifications, err := api.Repository.GetByStatus(clientID, status)
 	if err != nil {
 		respondWithInternalServerError(w, err.Error())
@@ -217,9 +215,7 @@ func (api *NotificationAPI) GetNotificationsHandler(w http.ResponseWriter, r *ht
 		})
 	}
 
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+	respondWithSuccess(w, response)
 }
 
 type notificationResponse struct {
@@ -240,8 +236,6 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 
 	log.Printf("Getting notification %d of client %s", notificationID, clientID)
 
-	w.Header().Set("Content-Type", "application/json")
-
 	notification, err := api.Repository.Get(clientID, uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
@@ -261,9 +255,7 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 		ReadAt:         notification.ReadAt,
 	}
 
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+	respondWithSuccess(w, response)
 }
 
 type changeNotificationStatusResponse struct {
@@ -298,14 +290,11 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 
 	log.Printf("Marking notification %d of client %s as read", notificationID, clientID)
 
-	w.Header().Set("Content-Type", "application/json")
-
 	response := changeNotificationStatusResponse{
 		Status: "read",
 	}
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+
+	respondWithSuccess(w, response)
 }
 
 // MarkNotificationUnreadHandler changes the notificatinn status to unread
@@ -335,12 +324,9 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 
 	log.Printf("Marking notification %d of client %s as unread", notificationID, clientID)
 
-	w.Header().Set("Content-Type", "application/json")
-
 	response := changeNotificationStatusResponse{
 		Status: "unread",
 	}
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+
+	respondWithSuccess(w, response)
 }
