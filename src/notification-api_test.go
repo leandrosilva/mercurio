@@ -80,6 +80,13 @@ func assertBodyContent(t *testing.T, rr *httptest.ResponseRecorder, expected str
 	}
 }
 
+func assertContent(t *testing.T, got interface{}, expected interface{}) {
+	if got != expected {
+		t.Errorf("unexpected value: got %v want %v",
+			got, expected)
+	}
+}
+
 // Test cases
 //
 
