@@ -20,13 +20,19 @@ func GetCurrentEnv() string {
 	return env
 }
 
-// LoadEnvironmentVars from .env files according on the provided MERCURIO_ENV. Defaults to development
-func LoadEnvironmentVars() {
+// GetEnvDir as per MERCURIO_ENV_DIR environment variable. When not provided, defaults to current directory (./)
+func GetEnvDir() string {
 	envDir := os.Getenv("MERCURIO_ENV_DIR")
 	if envDir == "" {
 		envDir += "./"
 	}
 
+	return envDir
+}
+
+// LoadEnvironmentVars from .env files according on the provided MERCURIO_ENV. Defaults to development
+func LoadEnvironmentVars() {
+	envDir := GetEnvDir()
 	env := GetCurrentEnv()
 
 	// 1st: Local overrides of environment-specific settings

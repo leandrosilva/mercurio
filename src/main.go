@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/urfave/negroni"
 )
@@ -28,40 +27,18 @@ func main() {
 	broker := mercurio.Broker
 	api := mercurio.API
 
-	// HTTP Routing
-	//
-
-	r := mux.NewRouter()
-
-	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		content := map[string]string{"message": "Welcome to Mercurio"}
-		respondWithSuccess(w, content)
-	})
-
-	eventsRouter := r.PathPrefix("/api/events").Subrouter()
-	eventsRouter.Handle("/unicast", jwtAuth.Secure(api.UnicastEventHandler)).Methods("POST")
-	eventsRouter.Handle("/broadcast", jwtAuth.Secure(api.BroadcastEventHandler)).Methods("POST")
-
-	clientsRouter := r.PathPrefix("/api/clients/{clientID}").Subrouter()
-	clientsRouter.Handle("/notifications/stream", jwtAuth.Secure(api.StreamNotificationsHandler))
-	clientsRouter.Handle("/notifications", jwtAuth.Secure(api.GetNotificationsHandler))
-	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}", jwtAuth.Secure(api.GetNotificationHandler))
-	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}/read", jwtAuth.Secure(api.MarkNotificationReadHandler)).Methods("PUT")
-	clientsRouter.Handle("/notifications/{notificationID:[0-9]+}/unread", jwtAuth.Secure(api.MarkNotificationUnreadHandler)).Methods("PUT")
-
-	// CORS
-	//
-
-	c := cors.New(GetCORSOptions())
-
 	// HTTP Server Setup & Boot
 	//
 
 	n := negroni.Classic()
+
+	c := cors.New(GetCORSOptions())
 	n.Use(c)
+
+	r := MountRoutes(jwtAuth, api)
 	n.UseHandler(r)
 
-	server := &http.Server{
+	s := &http.Server{
 		Addr:    GetHTTPServerAddress(),
 		Handler: n,
 	}
@@ -71,8 +48,8 @@ func main() {
 		log.Println("Running notification service broker")
 		broker.Run()
 
-		log.Println("HTTP server listening on", server.Addr)
-		err := server.ListenAndServe()
+		log.Println("HTTP server listening on", s.Addr)
+		err := s.ListenAndServe()
 		if err != nil {
 			log.Fatal("HTTP server error: ", err)
 		}
@@ -92,7 +69,7 @@ func main() {
 	defer cancel()
 
 	log.Println("Shutting down...")
-	server.Shutdown(ctx)
+	s.Shutdown(ctx)
 
 	log.Println("Bye bye")
 	os.Exit(0)
