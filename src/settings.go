@@ -22,21 +22,26 @@ func GetCurrentEnv() string {
 
 // LoadEnvironmentVars from .env files according on the provided MERCURIO_ENV. Defaults to development
 func LoadEnvironmentVars() {
+	envDir := os.Getenv("MERCURIO_ENV_DIR")
+	if envDir == "" {
+		envDir += "./"
+	}
+
 	env := GetCurrentEnv()
 
 	// 1st: Local overrides of environment-specific settings
-	godotenv.Load(".env." + env + ".local")
+	godotenv.Load(envDir + ".env." + env + ".local")
 
 	if env != "test" {
 		// 2nd: Local overrides. This file is loaded for all environments except test
-		godotenv.Load(".env.local")
+		godotenv.Load(envDir + ".env.local")
 	}
 
 	// 3rd: Shared environment-specific settings. May not .gitignore it
-	godotenv.Load(".env." + env)
+	godotenv.Load(envDir + ".env." + env)
 
 	// The original .env file. It depends whether .gitignore it or not
-	godotenv.Load()
+	godotenv.Load(envDir + ".env")
 }
 
 // GetAuthPrivateKey try and read the provided private key from either MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH environment variables
