@@ -15,15 +15,27 @@ import (
 )
 
 func main() {
+	loadEnvironmentVars()
+
 	// Basic underlying setup
 	//
 
-	jwtAuth, err := NewJWTAuthMiddleware()
+	authPrivateKey, err := GetAuthPrivateKey()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get a private key for JWT Auth Middleware due to: %s", err.Error()))
+	}
+
+	jwtAuth, err := NewJWTAuthMiddleware(authPrivateKey)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create JWT Auth Middleware due to: %s", err.Error()))
 	}
 
-	database := ConnectSqliteDatabase("./db/mercurio.db", true)
+	databaseFilePath, err := GetDatabaseConnectionString()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get file path for SQLite database due to: %s", err.Error()))
+	}
+
+	database := ConnectSqliteDatabase(databaseFilePath, true)
 	repository, err := NewSQLNotificationRepository(database)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create notification repository on top of an SQLite database due to: %s", err.Error()))
@@ -70,7 +82,7 @@ func main() {
 	n.UseHandler(r)
 
 	server := &http.Server{
-		Addr:    "127.0.0.1:8000",
+		Addr:    GetHTTPServerAddress(),
 		Handler: n,
 	}
 

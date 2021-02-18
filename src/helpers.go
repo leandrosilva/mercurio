@@ -3,7 +3,29 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 )
+
+// Environment variables
+//
+
+func loadEnvironmentVars() {
+	env := os.Getenv("MERCURIO_ENV")
+	if env == "" {
+		env = "development"
+	}
+	godotenv.Load(".env." + env + ".local")
+
+	if env != "test" {
+		godotenv.Load(".env.local")
+	}
+	godotenv.Load(".env." + env)
+
+	// The original .env file
+	godotenv.Load()
+}
 
 // HTTP
 //
