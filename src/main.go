@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	loadEnvironmentVars()
+	LoadEnvironmentVars()
 
 	// Basic underlying setup
 	//
@@ -68,11 +68,7 @@ func main() {
 	// CORS
 	//
 
-	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedHeaders: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"},
-	})
+	c := cors.New(GetCORSOptions())
 
 	// HTTP Server Setup & Boot
 	//

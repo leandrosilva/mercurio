@@ -4,7 +4,40 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
+
+// GetCurrentEnv as per MERCURIO_ENV environment variable. When not provided, defaults to development
+func GetCurrentEnv() string {
+	env := os.Getenv("MERCURIO_ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	return env
+}
+
+// LoadEnvironmentVars from .env files according on the provided MERCURIO_ENV. Defaults to development
+func LoadEnvironmentVars() {
+	env := GetCurrentEnv()
+
+	// 1st: Local overrides of environment-specific settings
+	godotenv.Load(".env." + env + ".local")
+
+	if env != "test" {
+		// 2nd: Local overrides. This file is loaded for all environments except test
+		godotenv.Load(".env.local")
+	}
+
+	// 3rd: Shared environment-specific settings. May not .gitignore it
+	godotenv.Load(".env." + env)
+
+	// The original .env file. It depends whether .gitignore it or not
+	godotenv.Load()
+}
 
 // GetAuthPrivateKey try and read the provided private key from either MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH environment variables
 func GetAuthPrivateKey() ([]byte, error) {
@@ -59,4 +92,29 @@ func GetHTTPServerAddress() string {
 	}
 
 	return httpHost + ":" + httpPort
+}
+
+func GetCORSOptions() cors.Options {
+	allowedOrigins := os.Getenv("MERCURIO_CORS_ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "*"
+	}
+
+	allowedHeaders := os.Getenv("MERCURIO_CORS_ALLOWED_HEADERS")
+	if allowedHeaders == "" {
+		allowedHeaders = "*"
+	}
+
+	allowedMethods := os.Getenv("MERCURIO_CORS_ALLOWED_METHODS")
+	if allowedMethods == "" {
+		allowedMethods = "GET,POST,PUT,DELETE,HEAD,OPTIONS"
+	}
+
+	options := cors.Options{
+		AllowedOrigins: strings.Split(allowedOrigins, ","),
+		AllowedHeaders: strings.Split(allowedHeaders, ","),
+		AllowedMethods: strings.Split(allowedMethods, ","),
+	}
+
+	return options
 }
