@@ -25,10 +25,13 @@ I've let things fairly well arranged and malleable **for a prototype**, with `.e
 
 ## TODO
 
-If you'd like to get your hands dirt with this little project, there is always somenthing that could be done. Send me a pull request if like.
+If you'd like to get your hands dirt with this little project, there is always somenthing that could be done. Send me a pull request if like. And of course, feel free to reach me out to discuss any feature or anything else.
+
+Tasks that I have in mind now are as follow:
 
 * Write a Dockerfile;
-* Definitely improve log;
+* Definitely improve logging;
+* Add a message queue in order to scale out the service (e.g. `{API}` save to db -> enqueue -> `{goroutine}` dequeue -> push to client);
 * Implement a nice client side app to show case a full closed loop;
 * Grow up and better the automated test suite (it's quite poor yet);
 * Automate GitHub pipeline;
