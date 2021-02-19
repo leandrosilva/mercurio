@@ -41,8 +41,8 @@ func (repository *SQLNotificationRepository) Update(notification *Notification) 
 }
 
 // Delete a notification in the SQL database
-func (repository *SQLNotificationRepository) Delete(destinationID string, id uint) error {
-	result := repository.db.Delete(&Notification{DestinationID: destinationID}, id)
+func (repository *SQLNotificationRepository) Delete(id uint) error {
+	result := repository.db.Delete(&Notification{}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -51,9 +51,9 @@ func (repository *SQLNotificationRepository) Delete(destinationID string, id uin
 }
 
 // Get a notification in the SQL database by its ID
-func (repository *SQLNotificationRepository) Get(destinationID string, id uint) (Notification, error) {
+func (repository *SQLNotificationRepository) Get(id uint) (Notification, error) {
 	var notification Notification
-	result := repository.db.Where(&Notification{ID: id, DestinationID: destinationID}).First(&notification)
+	result := repository.db.First(&notification, id)
 	if err := result.Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return Notification{}, ErrNotificationNotFound

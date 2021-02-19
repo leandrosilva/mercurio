@@ -80,8 +80,8 @@ var ErrNotificationNotFound = errors.New("notification not found")
 type NotificationRepository interface {
 	Add(notification *Notification) error
 	Update(notification *Notification) error
-	Delete(destinationID string, id uint) error
-	Get(destinationID string, id uint) (Notification, error)
+	Delete(id uint) error
+	Get(id uint) (Notification, error)
 	GetAll(destinationID string) ([]Notification, error)
 	GetByStatus(destinationID string, status string) ([]Notification, error)
 	FilterBy(destinationID string, criteria Notification) ([]Notification, error)

@@ -1,7 +1,6 @@
 # mercurio
-Simple Notification System written in Golang
+Bare Notification Service written based in Golang and SSE.
 
 ## TODO
 
-* Write tests
 * Add HTTPS;
