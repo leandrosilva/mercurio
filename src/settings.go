@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
@@ -36,18 +37,30 @@ func LoadEnvironmentVars() {
 	env := GetCurrentEnv()
 
 	// 1st: Local overrides of environment-specific settings
-	godotenv.Load(envDir + ".env." + env + ".local")
+	file := envDir + ".env." + env + ".local"
+	if godotenv.Load(file) == nil {
+		log.Printf("File %s is loaded", file)
+	}
 
 	if env != "test" {
 		// 2nd: Local overrides. This file is loaded for all environments except test
-		godotenv.Load(envDir + ".env.local")
+		file = envDir + ".env.local"
+		if godotenv.Load(file) == nil {
+			log.Printf("File %s is loaded", file)
+		}
 	}
 
 	// 3rd: Shared environment-specific settings. May not .gitignore it
-	godotenv.Load(envDir + ".env." + env)
+	file = envDir + ".env." + env
+	if godotenv.Load(file) == nil {
+		log.Printf("File %s is loaded", file)
+	}
 
 	// The original .env file. It depends whether .gitignore it or not
-	godotenv.Load(envDir + ".env")
+	file = envDir + ".env"
+	if godotenv.Load(file) == nil {
+		log.Printf("File %s is loaded", file)
+	}
 }
 
 // GetAuthPrivateKey try and read the provided private key from either MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH environment variables
@@ -65,7 +78,7 @@ func GetAuthPrivateKey() ([]byte, error) {
 
 		// If neither are provided, returns an error letting operation guys to know what is expected
 		if privateKeyFilePath == "" {
-			return nil, errors.New("Environment variable MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH must be provided")
+			return nil, errors.New("environment variable MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH must be provided")
 		}
 
 		privateKey, err := ioutil.ReadFile(privateKeyFilePath)
@@ -84,7 +97,7 @@ func GetAuthPrivateKey() ([]byte, error) {
 func GetDatabaseConnectionString() (string, error) {
 	databaseConn := os.Getenv("MERCURIO_DB_CONN")
 	if databaseConn == "" {
-		return "", errors.New("Environment variable MERCURIO_DB_CONN must be provided")
+		return "", errors.New("environment variable MERCURIO_DB_CONN must be provided")
 	}
 
 	return databaseConn, nil

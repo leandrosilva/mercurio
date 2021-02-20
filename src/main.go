@@ -20,7 +20,7 @@ func main() {
 
 	mercurio, err := NewMercurio()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	jwtAuth := mercurio.JWTAuth

@@ -35,6 +35,8 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
+	ensureEnvironmentVars()
+
 	LoadEnvironmentVars()
 
 	deleteTestDatabase()
@@ -57,6 +59,18 @@ func shutdown() {
 
 // General helpers
 //
+
+func ensureEnvironmentVars() {
+	if os.Getenv("MERCURIO_ENV") == "" {
+		os.Setenv("MERCURIO_ENV", "test")
+	}
+
+	if os.Getenv("MERCURIO_ENV_DIR") == "" {
+		os.Setenv("MERCURIO_ENV_DIR", "../")
+	}
+
+	fmt.Printf(">> environment '%s' loaded from '%s'\n", os.Getenv("MERCURIO_ENV"), os.Getenv("MERCURIO_ENV_DIR"))
+}
 
 func deleteTestDatabase() {
 	databasePath, err := GetDatabaseConnectionString()

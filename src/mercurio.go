@@ -27,7 +27,11 @@ func NewMercurio() (*Mercurio, error) {
 		return nil, fmt.Errorf("failed to get file path for SQLite database due to: %s", err.Error())
 	}
 
-	database := ConnectSqliteDatabase(databaseFilePath, true)
+	database, err := ConnectSqliteDatabase(databaseFilePath, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to SQLite database due to: %s", err.Error())
+	}
+
 	repository, err := NewSQLNotificationRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create notification repository on top of an SQLite database due to: %s", err.Error())
