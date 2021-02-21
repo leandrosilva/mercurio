@@ -108,6 +108,8 @@ func (broker *Broker) Run() error {
 
 			if broker.mq != nil {
 				select {
+				// TODO: there is some waste here since notifications published by this very service instance (which targets unknown clients) gets consumed back
+				//       I'm thinking to add a key on the route, in such a way that it could select and consume only what was not publish by itself
 				case message := <-rabbitMQ.IncomeMessages:
 					if len(message.Body) == 0 {
 						continue
