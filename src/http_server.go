@@ -4,9 +4,29 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
+	"github.com/urfave/negroni"
 )
 
-func MountRoutes(jwtAuth JWTAuthMiddleware, api NotificationAPI) *mux.Router {
+// NewHTTPServer creates a new HTTP server to serves Broker's Notification API
+func NewHTTPServer(jwtAuth JWTAuthMiddleware, api NotificationAPI) (*http.Server, error) {
+	n := negroni.Classic()
+
+	c := cors.New(GetCORSOptions())
+	n.Use(c)
+
+	r := mountRoutes(jwtAuth, api)
+	n.UseHandler(r)
+
+	s := &http.Server{
+		Addr:    GetHTTPServerAddress(),
+		Handler: n,
+	}
+
+	return s, nil
+}
+
+func mountRoutes(jwtAuth JWTAuthMiddleware, api NotificationAPI) *mux.Router {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

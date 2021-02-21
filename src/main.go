@@ -3,13 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"time"
-
-	"github.com/rs/cors"
-	"github.com/urfave/negroni"
 )
 
 func main() {
@@ -23,35 +19,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	jwtAuth := mercurio.JWTAuth
-	broker := mercurio.Broker
-	api := mercurio.API
-
-	// HTTP Server Setup & Boot
-	//
-
-	n := negroni.Classic()
-
-	c := cors.New(GetCORSOptions())
-	n.Use(c)
-
-	r := MountRoutes(jwtAuth, api)
-	n.UseHandler(r)
-
-	s := &http.Server{
-		Addr:    GetHTTPServerAddress(),
-		Handler: n,
-	}
-
 	// Spawns server on a goroutine in order to not block the flow
 	go func() {
-		log.Println("Running notification service broker")
-		broker.Run()
-
-		log.Println("HTTP server listening on", s.Addr)
-		err := s.ListenAndServe()
+		log.Println("Mercurio is starting...")
+		err := mercurio.Start()
 		if err != nil {
-			log.Fatal("HTTP server error: ", err)
+			log.Fatal("Mercurio failed due to: ", err)
 		}
 	}()
 
@@ -69,7 +42,7 @@ func main() {
 	defer cancel()
 
 	log.Println("Shutting down...")
-	s.Shutdown(ctx)
+	mercurio.Stop(ctx)
 
 	log.Println("Bye bye")
 	os.Exit(0)

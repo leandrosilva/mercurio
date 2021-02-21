@@ -1,13 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"log"
 )
 
 // Broker is the core notification service entity
 type Broker struct {
+	// Flags whether broker is isRunning or not
+	isRunning bool
+
 	// The underlying datastore for notifications persistence
 	repository NotificationRepository
+
+	// The underlying message-orinted middleware
+	mq MessageQueueChannel
 
 	// Events are pushed to this channel by the main events-gathering routine
 	notifications chan Notification
@@ -23,21 +30,48 @@ type Broker struct {
 }
 
 // NewBroker creates a new Broker and puts it to run
-func NewBroker(repository NotificationRepository) (broker *Broker) {
-	broker = &Broker{
+func NewBroker(repository NotificationRepository, mqSettings MessageQueueSettings) (*Broker, error) {
+	broker := &Broker{
+		isRunning:      false,
 		repository:     repository,
 		notifications:  make(chan Notification, 1),
 		newClients:     make(chan Client),
 		closingClients: make(chan Client),
 		clients:        make(map[string]Client),
 	}
-	return
+
+	// We're assuming RabbitMQ here but we can change it in the future and encapsulate it another way
+	// in a factory or something
+	if mqSettings.Use {
+		mq, err := NewRabbitMQChannel(mqSettings)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect & setup a channel with RabbitMQ server due to: %s", err)
+		}
+		broker.mq = mq
+	}
+
+	return broker, nil
 }
 
 // Run starts of the Broker notification service
-func (broker *Broker) Run() {
+func (broker *Broker) Run() error {
+	broker.isRunning = true
+
+	// As we know we're working with RabbitMQ in the current incarnation of Mercurio, let't make thing
+	// a bit specific here
+	var rabbitMQ *RabbitMQConsumer
+	if broker.mq != nil {
+		consummer, err := broker.mq.ConsumeNotifications()
+		if err != nil {
+			broker.isRunning = false
+			return err
+		}
+		rabbitMQ = consummer.(*RabbitMQConsumer)
+	}
+
+	// The message exchange goroutine
 	go func() {
-		for {
+		for broker.isRunning {
 			select {
 			case c := <-broker.newClients:
 				// A new client has connected
@@ -54,14 +88,62 @@ func (broker *Broker) Run() {
 			case notification := <-broker.notifications:
 				// We got a new event from the outside!
 				// Should notify the destination client
+				clientID := notification.DestinationID
 				client, exists := broker.clients[notification.DestinationID]
 				if exists {
 					client.Channel <- notification
-					log.Printf("Send notification to client %s ", client.ID)
+					log.Printf("Send notification %d to client %s", notification.ID, clientID)
+				}
+
+				if broker.mq != nil {
+					// Publish message to MQ -- maybe should have an additional condition here to decide
+					// whether or to send the notification to MQ
+					if !exists {
+						log.Printf("Publish to MQ notification %d for client %s. (not in this service node)", notification.ID, clientID)
+						broker.mq.PublishNotification(notification)
+					}
+				}
+			}
+
+			if broker.mq != nil {
+				select {
+				case message := <-rabbitMQ.IncomeMessages:
+					if len(message.Body) == 0 {
+						continue
+					}
+
+					notification, err := UnmarshalNotification(message.Body)
+					if err != nil {
+						log.Printf("Could not unmarshal message body due to: %s", err)
+					}
+
+					clientID := notification.DestinationID
+					log.Printf("Got from MQ with notification %d for client %s", notification.ID, clientID)
+
+					client, exists := broker.clients[notification.DestinationID]
+					if exists {
+						client.Channel <- notification
+						log.Printf("Send notification %d got from MQ to client %s", notification.ID, clientID)
+					}
+
+					log.Printf("Ack message %s got from MQ with notification for client %s", message.MessageId, clientID)
+					message.Ack(false)
 				}
 			}
 		}
 	}()
+
+	return nil
+}
+
+// Stop shuts down the Broker notification service
+func (broker *Broker) Stop() {
+	broker.isRunning = false
+
+	if broker.mq != nil {
+		log.Println("Closing MQ channel")
+		broker.mq.CloseChannel()
+	}
 }
 
 // NotifyClientConnected notifies a new client has arrived

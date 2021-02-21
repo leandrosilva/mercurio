@@ -17,7 +17,6 @@ func GetCurrentEnv() string {
 	if env == "" {
 		env = "development"
 	}
-
 	return env
 }
 
@@ -27,7 +26,6 @@ func GetEnvDir() string {
 	if envDir == "" {
 		envDir += "./"
 	}
-
 	return envDir
 }
 
@@ -39,27 +37,27 @@ func LoadEnvironmentVars() {
 	// 1st: Local overrides of environment-specific settings
 	file := envDir + ".env." + env + ".local"
 	if godotenv.Load(file) == nil {
-		log.Printf("File %s is loaded", file)
+		log.Printf("File '%s' is loaded", file)
 	}
 
 	if env != "test" {
 		// 2nd: Local overrides. This file is loaded for all environments except test
 		file = envDir + ".env.local"
 		if godotenv.Load(file) == nil {
-			log.Printf("File %s is loaded", file)
+			log.Printf("File '%s' is loaded", file)
 		}
 	}
 
 	// 3rd: Shared environment-specific settings. May not .gitignore it
 	file = envDir + ".env." + env
 	if godotenv.Load(file) == nil {
-		log.Printf("File %s is loaded", file)
+		log.Printf("File '%s' is loaded", file)
 	}
 
 	// The original .env file. It depends whether .gitignore it or not
 	file = envDir + ".env"
 	if godotenv.Load(file) == nil {
-		log.Printf("File %s is loaded", file)
+		log.Printf("File '%s' is loaded", file)
 	}
 }
 
@@ -99,7 +97,6 @@ func GetDatabaseConnectionString() (string, error) {
 	if databaseConn == "" {
 		return "", errors.New("environment variable MERCURIO_DB_CONN must be provided")
 	}
-
 	return databaseConn, nil
 }
 
@@ -118,6 +115,8 @@ func GetHTTPServerAddress() string {
 	return httpHost + ":" + httpPort
 }
 
+// GetCORSOptions builds from the content of MERCURIO_CORS_ALLOWED_ORIGINS, MERCURIO_CORS_ALLOWED_HEADERS,
+// and MERCURIO_CORS_ALLOWED_METHODS, with broad defaults when missing
 func GetCORSOptions() cors.Options {
 	allowedOrigins := os.Getenv("MERCURIO_CORS_ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
@@ -141,4 +140,42 @@ func GetCORSOptions() cors.Options {
 	}
 
 	return options
+}
+
+// UseMQ as per MERCURIO_MQ missing or equals to "on"
+func UseMQ() bool {
+	mq := strings.ToLower(os.Getenv("MERCURIO_MQ"))
+	if mq == "" || mq == "on" {
+		return true
+	}
+	return false
+}
+
+// GetMQSettings builds from the content of MERCURIO_MQ_CONN, MERCURIO_MQ_TOPIC and MERCURIO_MQ_ROUTING_KEY
+func GetMQSettings() (MessageQueueSettings, error) {
+	mqUse := UseMQ()
+
+	mqConn := os.Getenv("MERCURIO_MQ_CONN")
+	if mqConn == "" && mqUse {
+		return MessageQueueSettings{}, errors.New("environment variable MERCURIO_MQ_CONN must be provided")
+	}
+
+	mqTopic := os.Getenv("MERCURIO_MQ_TOPIC")
+	if mqTopic == "" && mqUse {
+		return MessageQueueSettings{}, errors.New("environment variable MERCURIO_MQ_TOPIC must be provided")
+	}
+
+	mqRoutingKey := os.Getenv("MERCURIO_MQ_ROUTING_KEY")
+	if mqRoutingKey == "" && mqUse {
+		return MessageQueueSettings{}, errors.New("environment variable MERCURIO_MQ_ROUTING_KEY must be provided")
+	}
+
+	settings := MessageQueueSettings{
+		Use:        mqUse,
+		URL:        mqConn,
+		Topic:      mqTopic,
+		RoutingKey: mqRoutingKey,
+	}
+
+	return settings, nil
 }

@@ -9,6 +9,8 @@ For security, it uses [JWT](https://jwt.io/) -- even on the SSE channel (a.k.a. 
 
 As it is a prototype, [SQLite](https://www.sqlite.org/index.html) is being used for persistence. To make it even easier, [GORM](https://gorm.io/) is in charge of migrations and object-relational mapping.
 
+There is also an optional feature (turned `off` by default) of using an underlying [RabbitMQ](https://www.rabbitmq.com/) to allow for horizontal scaling. It could well being [ActiveMQ](https://activemq.apache.org/), [Amazon SQS](https://aws.amazon.com/sqs/), [Redis Pub/Sub](https://redis.io/topics/pubsub) or whatever message-oriented middleware platform for that matter. I went with RabbitMQ because I got it running on Docker container so why not?
+
 # What is included?
 
 * Source code is in `./src` folder;
@@ -31,7 +33,6 @@ Tasks that I have in mind now are as follow:
 
 * Write a Dockerfile;
 * Definitely improve logging;
-* Add a message queue in order to scale out the service (e.g. `{API}` save to db -> enqueue -> `{goroutine}` dequeue -> push to client);
 * Implement a nice client side app to show case a full closed loop;
 * Grow up and better the automated test suite (it's quite poor yet);
 * Automate GitHub pipeline;
