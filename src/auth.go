@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -17,12 +16,7 @@ type JWTAuthMiddleware struct {
 }
 
 // NewJWTAuthMiddleware creates a new JWTSecureMiddleware instance for our secret key
-func NewJWTAuthMiddleware() (JWTAuthMiddleware, error) {
-	privateKey, err := ioutil.ReadFile("auth/private-key")
-	if err != nil {
-		return JWTAuthMiddleware{}, err
-	}
-
+func NewJWTAuthMiddleware(privateKey []byte) (JWTAuthMiddleware, error) {
 	middleware := jwtmiddleware.New(jwtmiddleware.Options{
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
 			return privateKey, nil
@@ -56,7 +50,7 @@ func checkAuthorizedUserIsValid(w http.ResponseWriter, r *http.Request, next htt
 	if clientID != "" {
 		// Does the token correspond to the expected client?
 		if !isAuthorizedUserValid(r, clientID) {
-			log.Println("blocking")
+			log.Printf("Blocking access: clientID %s", clientID)
 			respondWithUnauthorized(w, "authorization token does not correspond to expected client")
 			return
 		}

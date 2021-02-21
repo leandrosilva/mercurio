@@ -51,15 +51,12 @@ func (api *NotificationAPI) UnicastEventHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	response := unicastEventResponse{
 		NotificationID: notification.ID,
 		EventID:        notification.EventID,
 	}
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+
+	respondWithSuccess(w, response)
 }
 
 type broadcastEventResponse struct {
@@ -86,8 +83,6 @@ func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	response := []broadcastEventResponse{}
 	for _, notification := range notifications {
 		response = append(response, broadcastEventResponse{
@@ -96,9 +91,7 @@ func (api *NotificationAPI) BroadcastEventHandler(w http.ResponseWriter, r *http
 		})
 	}
 
-	if err := json.NewEncoder(w).Encode(&response); err != nil {
-		respondWithInternalServerError(w, err.Error())
-	}
+	respondWithSuccess(w, response)
 }
 
 type streamNotificationsResponse struct {
@@ -236,7 +229,7 @@ func (api *NotificationAPI) GetNotificationHandler(w http.ResponseWriter, r *htt
 
 	log.Printf("Getting notification %d of client %s", notificationID, clientID)
 
-	notification, err := api.Repository.Get(clientID, uint(notificationID))
+	notification, err := api.Repository.Get(uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			respondWithNotFound(w, err.Error())
@@ -268,7 +261,7 @@ func (api *NotificationAPI) MarkNotificationReadHandler(w http.ResponseWriter, r
 	clientID := vars["clientID"]
 	notificationID, _ := strconv.Atoi(vars["notificationID"])
 
-	notification, err := api.Repository.Get(clientID, uint(notificationID))
+	notification, err := api.Repository.Get(uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			respondWithNotFound(w, err.Error())
@@ -303,7 +296,7 @@ func (api *NotificationAPI) MarkNotificationUnreadHandler(w http.ResponseWriter,
 	clientID := vars["clientID"]
 	notificationID, _ := strconv.Atoi(vars["notificationID"])
 
-	notification, err := api.Repository.Get(clientID, uint(notificationID))
+	notification, err := api.Repository.Get(uint(notificationID))
 	if err != nil {
 		if errors.Is(err, ErrNotificationNotFound) {
 			respondWithNotFound(w, err.Error())
