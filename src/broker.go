@@ -103,6 +103,7 @@ func (broker *Broker) Run() error {
 						broker.mq.PublishNotification(notification)
 					}
 				}
+			default:
 			}
 
 			if broker.mq != nil {
@@ -125,9 +126,7 @@ func (broker *Broker) Run() error {
 						client.Channel <- notification
 						log.Printf("Send notification %d got from MQ to client %s", notification.ID, clientID)
 					}
-
-					log.Printf("Ack message %s got from MQ with notification for client %s", message.MessageId, clientID)
-					message.Ack(false)
+				default:
 				}
 			}
 		}

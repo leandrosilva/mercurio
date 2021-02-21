@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	BASE_EVENTS_URL        = "/api/events"
-	BASE_NOTIFICATIONS_URI = "/api/clients/{clientID}/notifications"
+	baseEventsURL        = "/api/events"
+	baseNotificationsURL = "/api/clients/{clientID}/notifications"
 )
 
 var (
@@ -162,7 +162,7 @@ func assertContent(t *testing.T, got interface{}, expected interface{}) {
 //
 
 func TestGetNotificationsHandler_WithoutAuthToken_ShouldBeUnauthorized(t *testing.T) {
-	r, err := http.NewRequest("GET", BASE_NOTIFICATIONS_URI, nil)
+	r, err := http.NewRequest("GET", baseNotificationsURL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestGetNotificationsHandler_WithoutAuthToken_ShouldBeUnauthorized(t *testin
 
 func TestUnicastNotificationHandler_WithoutAuthToken_ShouldBeUnauthorized(t *testing.T) {
 	payload := `{"sourceID":"terminal","destinationID":"123","data":"some blah blah blah kind of thing"}`
-	r, err := http.NewRequest("POST", BASE_EVENTS_URL+"/unicast", strings.NewReader(payload))
+	r, err := http.NewRequest("POST", baseEventsURL+"/unicast", strings.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,16 +192,16 @@ func TestUnicastNotificationHandler_WithoutAuthToken_ShouldBeUnauthorized(t *tes
 
 func TestHappyPathForUser123(t *testing.T) {
 	rt := mux.NewRouter()
-	rt.HandleFunc(BASE_EVENTS_URL+"/unicast", jwtAuth.Secure(api.UnicastEventHandler).ServeHTTP)
-	rt.HandleFunc(BASE_NOTIFICATIONS_URI, jwtAuth.Secure(api.GetNotificationsHandler).ServeHTTP)
-	rt.HandleFunc(BASE_NOTIFICATIONS_URI+"/{notificationID}", jwtAuth.Secure(api.GetNotificationHandler).ServeHTTP)
-	rt.HandleFunc(BASE_NOTIFICATIONS_URI+"/{notificationID}/read", jwtAuth.Secure(api.MarkNotificationReadHandler).ServeHTTP).Methods("PUT")
-	rt.HandleFunc(BASE_NOTIFICATIONS_URI+"/{notificationID}/unread", jwtAuth.Secure(api.MarkNotificationUnreadHandler).ServeHTTP).Methods("PUT")
+	rt.HandleFunc(baseEventsURL+"/unicast", jwtAuth.Secure(api.UnicastEventHandler).ServeHTTP)
+	rt.HandleFunc(baseNotificationsURL, jwtAuth.Secure(api.GetNotificationsHandler).ServeHTTP)
+	rt.HandleFunc(baseNotificationsURL+"/{notificationID}", jwtAuth.Secure(api.GetNotificationHandler).ServeHTTP)
+	rt.HandleFunc(baseNotificationsURL+"/{notificationID}/read", jwtAuth.Secure(api.MarkNotificationReadHandler).ServeHTTP).Methods("PUT")
+	rt.HandleFunc(baseNotificationsURL+"/{notificationID}/unread", jwtAuth.Secure(api.MarkNotificationUnreadHandler).ServeHTTP).Methods("PUT")
 
-	BASE_NOTIFICATIONS_URI_123 := strings.Replace(BASE_NOTIFICATIONS_URI, "{clientID}", "123", 1)
+	baseNotificationsURL123 := strings.Replace(baseNotificationsURL, "{clientID}", "123", 1)
 
 	// 1- Empty database, there is no notifications yet
-	r := createUserRequest(t, "GET", BASE_NOTIFICATIONS_URI_123, nil)
+	r := createUserRequest(t, "GET", baseNotificationsURL123, nil)
 	rr := serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)
@@ -209,7 +209,7 @@ func TestHappyPathForUser123(t *testing.T) {
 
 	// 2- Publishes one event to user
 	payload := `{"sourceID":"test","destinationID":"123","data":"some blah blah blah kind of thing"}`
-	r = createPublisherRequest(t, "POST", BASE_EVENTS_URL+"/unicast", strings.NewReader(payload))
+	r = createPublisherRequest(t, "POST", baseEventsURL+"/unicast", strings.NewReader(payload))
 	rr = serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)
@@ -221,7 +221,7 @@ func TestHappyPathForUser123(t *testing.T) {
 	eventID := object["eventID"]
 
 	// 3- Gets the notification for the published event
-	r = createUserRequest(t, "GET", fmt.Sprintf("%s/%v", BASE_NOTIFICATIONS_URI_123, notificationID), nil)
+	r = createUserRequest(t, "GET", fmt.Sprintf("%s/%v", baseNotificationsURL123, notificationID), nil)
 	rr = serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)
@@ -231,7 +231,7 @@ func TestHappyPathForUser123(t *testing.T) {
 	assertContent(t, object["eventID"], eventID)
 
 	// 4- Gets notifications, now, with the recently published one
-	r = createUserRequest(t, "GET", BASE_NOTIFICATIONS_URI_123, nil)
+	r = createUserRequest(t, "GET", baseNotificationsURL123, nil)
 	rr = serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)
@@ -245,7 +245,7 @@ func TestHappyPathForUser123(t *testing.T) {
 
 	// 5- Marks notification as read
 
-	r = createUserRequest(t, "PUT", fmt.Sprintf("%s/%v/%s", BASE_NOTIFICATIONS_URI_123, notificationID, "read"), nil)
+	r = createUserRequest(t, "PUT", fmt.Sprintf("%s/%v/%s", baseNotificationsURL123, notificationID, "read"), nil)
 	rr = serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)
@@ -255,7 +255,7 @@ func TestHappyPathForUser123(t *testing.T) {
 
 	// 5- Marks notification back as unread
 
-	r = createUserRequest(t, "PUT", fmt.Sprintf("%s/%v/%s", BASE_NOTIFICATIONS_URI_123, notificationID, "unread"), nil)
+	r = createUserRequest(t, "PUT", fmt.Sprintf("%s/%v/%s", baseNotificationsURL123, notificationID, "unread"), nil)
 	rr = serveHTTPRequest(rt, r)
 
 	assertStatusCode(t, rr, http.StatusOK)

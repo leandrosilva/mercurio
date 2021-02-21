@@ -129,7 +129,7 @@ func (mq *RabbitMQChannel) ConsumeNotifications() (MessageConsumer, error) {
 	msgs, err := mq.subChannel.Consume(
 		mq.queue, // queue
 		"",       // consumer
-		false,    // auto ack
+		true,     // auto ack
 		false,    // exclusive
 		false,    // no local
 		false,    // no wait
