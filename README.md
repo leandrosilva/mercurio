@@ -35,6 +35,7 @@ Tasks that I have in mind now are as follow:
 * Definitely improve logging;
 * Implement a nice client side app to show case a full closed loop;
 * Grow up and better the automated test suite (it's quite poor yet);
+* Clients might be interested in receive notifications of a certain sort;
 * Automate GitHub pipeline;
 * Add HTTPS (maybe -- 'cause we can just have that on load balancer).
 
