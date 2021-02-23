@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+
+	"github.com/streadway/amqp"
 )
 
 // Broker is the core notification service entity
@@ -59,14 +61,14 @@ func (broker *Broker) Run() error {
 
 	// As we know we're working with RabbitMQ in the current incarnation of Mercurio, let't make thing
 	// a bit specific here
-	var rabbitMQ *RabbitMQConsumer
+	var incomeMessages <-chan amqp.Delivery
 	if broker.mq != nil {
 		consummer, err := broker.mq.ConsumeNotifications()
 		if err != nil {
 			broker.isRunning = false
 			return err
 		}
-		rabbitMQ = consummer.(*RabbitMQConsumer)
+		incomeMessages = consummer.(*RabbitMQConsumer).IncomeMessages
 	}
 
 	// The message exchange goroutine
@@ -103,33 +105,28 @@ func (broker *Broker) Run() error {
 						broker.mq.PublishNotification(notification)
 					}
 				}
-			default:
-			}
 
-			if broker.mq != nil {
-				select {
-				// TODO: there is some waste here since notifications published by this very service instance (which targets unknown clients) gets consumed back
-				//       I'm thinking to add a key on the route, in such a way that it could select and consume only what was not publish by itself
-				case message := <-rabbitMQ.IncomeMessages:
-					if len(message.Body) == 0 {
-						continue
-					}
-
-					notification, err := UnmarshalNotification(message.Body)
-					if err != nil {
-						log.Printf("Could not unmarshal message body due to: %s", err)
-					}
-
-					clientID := notification.DestinationID
-					log.Printf("Got from MQ with notification %d for client %s", notification.ID, clientID)
-
-					client, exists := broker.clients[notification.DestinationID]
-					if exists {
-						client.Channel <- notification
-						log.Printf("Send notification %d got from MQ to client %s", notification.ID, clientID)
-					}
-				default:
+			// TODO: there is some waste here since notifications published by this very service instance (which targets unknown clients) gets consumed back
+			//       I'm thinking to add a key on the route, in such a way that it could select and consume only what was not publish by itself
+			case message := <-incomeMessages:
+				if len(message.Body) == 0 {
+					continue
 				}
+
+				notification, err := UnmarshalNotification(message.Body)
+				if err != nil {
+					log.Printf("Could not unmarshal message body due to: %s", err)
+				}
+
+				clientID := notification.DestinationID
+				log.Printf("Got from MQ with notification %d for client %s", notification.ID, clientID)
+
+				client, exists := broker.clients[notification.DestinationID]
+				if exists {
+					client.Channel <- notification
+					log.Printf("Send notification %d got from MQ to client %s", notification.ID, clientID)
+				}
+			default:
 			}
 		}
 	}()
