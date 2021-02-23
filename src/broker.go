@@ -15,7 +15,7 @@ type Broker struct {
 	// The underlying datastore for notifications persistence
 	repository NotificationRepository
 
-	// The underlying message-orinted middleware
+	// The underlying message-orinted middleware (might be nil if it does not uses one; it depends on settings passed by on creation)
 	mq MessageQueueChannel
 
 	// Events are pushed to this channel by the main events-gathering routine
@@ -92,6 +92,9 @@ func (broker *Broker) Run() error {
 				// Should notify the destination client
 				clientID := notification.DestinationID
 				client, exists := broker.clients[notification.DestinationID]
+
+				log.Printf("Got notification %d for client %s (known = %v)", notification.ID, clientID, exists)
+
 				if exists {
 					client.Channel <- notification
 					log.Printf("Send notification %d to client %s", notification.ID, clientID)
@@ -101,7 +104,7 @@ func (broker *Broker) Run() error {
 					// Publish message to MQ -- maybe should have an additional condition here to decide
 					// whether or to send the notification to MQ
 					if !exists {
-						log.Printf("Publish to MQ notification %d for client %s. (not in this service node)", notification.ID, clientID)
+						log.Printf("Publish to MQ notification %d for client %s. (which is unknown to this service node)", notification.ID, clientID)
 						broker.mq.PublishNotification(notification)
 					}
 				}
@@ -119,9 +122,10 @@ func (broker *Broker) Run() error {
 				}
 
 				clientID := notification.DestinationID
-				log.Printf("Got from MQ with notification %d for client %s", notification.ID, clientID)
-
 				client, exists := broker.clients[notification.DestinationID]
+
+				log.Printf("Got from MQ with notification %d for client %s (known = %v)", notification.ID, clientID, exists)
+
 				if exists {
 					client.Channel <- notification
 					log.Printf("Send notification %d got from MQ to client %s", notification.ID, clientID)
