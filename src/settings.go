@@ -11,8 +11,8 @@ import (
 	"github.com/rs/cors"
 )
 
-// GetCurrentEnv as per MERCURIO_ENV environment variable. When not provided, defaults to development
-func GetCurrentEnv() string {
+// GetEnvName as per MERCURIO_ENV environment variable. When not provided, defaults to development
+func GetEnvName() string {
 	env := os.Getenv("MERCURIO_ENV")
 	if env == "" {
 		env = "development"
@@ -32,7 +32,7 @@ func GetEnvDir() string {
 // LoadEnvironmentVars from .env files according on the provided MERCURIO_ENV. Defaults to development
 func LoadEnvironmentVars() {
 	envDir := GetEnvDir()
-	env := GetCurrentEnv()
+	env := GetEnvName()
 
 	// 1st: Local overrides of environment-specific settings
 	file := envDir + ".env." + env + ".local"
@@ -59,6 +59,16 @@ func LoadEnvironmentVars() {
 	if godotenv.Load(file) == nil {
 		log.Printf("File '%s' is loaded", file)
 	}
+}
+
+// GetNID tells the service node ID (in a multi-deployment setup) as per MERCURIO_NID environment variable. When not provided,
+// defaults to 'Mercurio-' + MERCURIO_ENV (e.g. Mercurio-development)
+func GetNID() string {
+	nodeID := os.Getenv("MERCURIO_NID")
+	if nodeID == "" {
+		nodeID = "Mercurio-" + GetEnvName()
+	}
+	return nodeID
 }
 
 // GetAuthPrivateKey try and read the provided private key from either MERCURIO_AUTH_PK_TEXT or MERCURIO_AUTH_PK_PATH environment variables

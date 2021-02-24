@@ -9,6 +9,9 @@ import (
 
 // Broker is the core notification service entity
 type Broker struct {
+	// The service node ID where this broken is running in
+	nid string
+
 	// Flags whether broker is isRunning or not
 	isRunning bool
 
@@ -16,7 +19,7 @@ type Broker struct {
 	repository NotificationRepository
 
 	// The underlying message-orinted middleware (might be nil if it does not uses one; it depends on settings passed by on creation)
-	mq MessageQueueChannel
+	mq MessageQueueConnection
 
 	// Events are pushed to this channel by the main events-gathering routine
 	notifications chan Notification
@@ -32,8 +35,9 @@ type Broker struct {
 }
 
 // NewBroker creates a new Broker and puts it to run
-func NewBroker(repository NotificationRepository, mqSettings MessageQueueSettings) (*Broker, error) {
+func NewBroker(nid string, repository NotificationRepository, mqSettings MessageQueueSettings) (*Broker, error) {
 	broker := &Broker{
+		nid:            nid,
 		isRunning:      false,
 		repository:     repository,
 		notifications:  make(chan Notification, 1),
@@ -45,7 +49,7 @@ func NewBroker(repository NotificationRepository, mqSettings MessageQueueSetting
 	// We're assuming RabbitMQ here but we can change it in the future and encapsulate it another way
 	// in a factory or something
 	if mqSettings.Use {
-		mq, err := NewRabbitMQChannel(mqSettings)
+		mq, err := NewRabbitMQConnection(nid, mqSettings)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect & setup a channel with RabbitMQ server due to: %s", err)
 		}
@@ -56,16 +60,16 @@ func NewBroker(repository NotificationRepository, mqSettings MessageQueueSetting
 }
 
 // Run starts of the Broker notification service
-func (broker *Broker) Run() error {
-	broker.isRunning = true
+func (b *Broker) Run() error {
+	b.isRunning = true
 
 	// As we know we're working with RabbitMQ in the current incarnation of Mercurio, let't make thing
 	// a bit specific here
 	var incomeMessages <-chan amqp.Delivery
-	if broker.mq != nil {
-		consummer, err := broker.mq.ConsumeNotifications()
+	if b.mq != nil {
+		consummer, err := b.mq.ConsumeNotifications()
 		if err != nil {
-			broker.isRunning = false
+			b.isRunning = false
 			return err
 		}
 		incomeMessages = consummer.(*RabbitMQConsumer).IncomeMessages
@@ -73,25 +77,25 @@ func (broker *Broker) Run() error {
 
 	// The message exchange goroutine
 	go func() {
-		for broker.isRunning {
+		for b.isRunning {
 			select {
-			case c := <-broker.newClients:
+			case c := <-b.newClients:
 				// A new client has connected
 				// Register their message channel
-				broker.clients[c.ID] = c
-				log.Printf("Client added. (%d registered clients)", len(broker.clients))
+				b.clients[c.ID] = c
+				log.Printf("Client added. (%d registered clients)", len(b.clients))
 
-			case c := <-broker.closingClients:
+			case c := <-b.closingClients:
 				// A client has dettached and we want to
 				// stop sending them messages.
-				delete(broker.clients, c.ID)
-				log.Printf("Removed client. (%d registered clients)", len(broker.clients))
+				delete(b.clients, c.ID)
+				log.Printf("Removed client. (%d registered clients)", len(b.clients))
 
-			case notification := <-broker.notifications:
+			case notification := <-b.notifications:
 				// We got a new event from the outside!
 				// Should notify the destination client
 				clientID := notification.DestinationID
-				client, exists := broker.clients[notification.DestinationID]
+				client, exists := b.clients[notification.DestinationID]
 
 				log.Printf("Got notification %d for client %s (known = %v)", notification.ID, clientID, exists)
 
@@ -100,19 +104,24 @@ func (broker *Broker) Run() error {
 					log.Printf("Send notification %d to client %s", notification.ID, clientID)
 				}
 
-				if broker.mq != nil {
+				if b.mq != nil {
 					// Publish message to MQ -- maybe should have an additional condition here to decide
 					// whether or to send the notification to MQ
 					if !exists {
 						log.Printf("Publish to MQ notification %d for client %s. (which is unknown to this service node)", notification.ID, clientID)
-						broker.mq.PublishNotification(notification)
+						b.mq.PublishNotification(notification)
 					}
 				}
 
-			// It receives messages that was published by itself, acks it and move forward without do anything else; otherwise
-			// if the client is known, pushes the notification as normal
+			// It receives messages that was published by itself, auto acks it (its queue is exclusive) and move forward without do anything else;
+			// otherwise when receiving messages published by other service nodes, if the client is known here, pushes the notification as normal
 			case message := <-incomeMessages:
 				if len(message.Body) == 0 {
+					continue
+				}
+
+				if message.AppId == b.nid {
+					log.Printf("Message %s was published by myself, skipping it...", message.MessageId)
 					continue
 				}
 
@@ -122,7 +131,7 @@ func (broker *Broker) Run() error {
 				}
 
 				clientID := notification.DestinationID
-				client, exists := broker.clients[notification.DestinationID]
+				client, exists := b.clients[notification.DestinationID]
 
 				log.Printf("Got from MQ with notification %d for client %s (known = %v)", notification.ID, clientID, exists)
 
@@ -139,44 +148,44 @@ func (broker *Broker) Run() error {
 }
 
 // Stop shuts down the Broker notification service
-func (broker *Broker) Stop() {
-	broker.isRunning = false
+func (b *Broker) Stop() {
+	b.isRunning = false
 
-	if broker.mq != nil {
+	if b.mq != nil {
 		log.Println("Closing MQ channel")
-		broker.mq.CloseChannel()
+		b.mq.Close()
 	}
 }
 
 // NotifyClientConnected notifies a new client has arrived
-func (broker *Broker) NotifyClientConnected(client Client) {
-	broker.newClients <- client
+func (b *Broker) NotifyClientConnected(client Client) {
+	b.newClients <- client
 }
 
 // NotifyClientDisconnected notifies a client is gone
-func (broker *Broker) NotifyClientDisconnected(client Client) {
-	broker.closingClients <- client
+func (b *Broker) NotifyClientDisconnected(client Client) {
+	b.closingClients <- client
 }
 
 // NotifyEvent when an event has occourred for one destination
-func (broker *Broker) NotifyEvent(event Event) (Notification, error) {
+func (b *Broker) NotifyEvent(event Event) (Notification, error) {
 	notification, err := NewNotification(&event)
 	if err != nil {
 		return Notification{}, err
 	}
 
-	err = broker.repository.Add(notification)
+	err = b.repository.Add(notification)
 	if err != nil {
 		return Notification{}, err
 	}
 
-	broker.notifications <- *notification
+	b.notifications <- *notification
 
 	return *notification, nil
 }
 
 // BroadcastEvent when an event has occourred for many destinations
-func (broker *Broker) BroadcastEvent(broadcastEvent BroadcastEvent) ([]Notification, error) {
+func (b *Broker) BroadcastEvent(broadcastEvent BroadcastEvent) ([]Notification, error) {
 	notifications := []Notification{}
 
 	for _, destinationID := range broadcastEvent.Destinations {
@@ -187,7 +196,7 @@ func (broker *Broker) BroadcastEvent(broadcastEvent BroadcastEvent) ([]Notificat
 			Data:          broadcastEvent.Data,
 		}
 
-		notification, err := broker.NotifyEvent(event)
+		notification, err := b.NotifyEvent(event)
 		if err != nil {
 			return nil, err
 		}

@@ -21,10 +21,10 @@ func main() {
 
 	// Spawns server on a goroutine in order to not block the flow
 	go func() {
-		log.Println("Mercurio is starting...")
+		log.Printf("Mercurio %s is starting...", mercurio.NID)
 		err := mercurio.Start()
 		if err != nil {
-			log.Fatal("Mercurio failed due to: ", err)
+			log.Fatalf("Mercurio %s failed due to: %s", mercurio.NID, err)
 		}
 	}()
 

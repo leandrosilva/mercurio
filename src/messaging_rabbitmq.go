@@ -18,8 +18,11 @@ func (mc *RabbitMQConsumer) IsReady() bool {
 	return mc.IncomeMessages != nil
 }
 
-// RabbitMQChannel is a wrapper to an open channel to a RabbitMQ server
-type RabbitMQChannel struct {
+// RabbitMQConnection is a wrapper to an open connection to a RabbitMQ server, with two-way channel (i.e. pub/sub, producer/consumer)
+type RabbitMQConnection struct {
+	// The service node ID where this broken is running in
+	nid string
+
 	connection *amqp.Connection
 	pubChannel *amqp.Channel
 	subChannel *amqp.Channel
@@ -28,8 +31,8 @@ type RabbitMQChannel struct {
 	queue      string
 }
 
-// NewRabbitMQChannel opens a new TCP connection to a RabbitMQ server and gets channel setted up too
-func NewRabbitMQChannel(settings MessageQueueSettings) (*RabbitMQChannel, error) {
+// NewRabbitMQConnection opens a new TCP connection to a RabbitMQ server and gets pub/sub channels setted up too
+func NewRabbitMQConnection(nid string, settings MessageQueueSettings) (*RabbitMQConnection, error) {
 	conn, err := amqp.Dial(settings.URL)
 	if err != nil {
 		return nil, err
@@ -80,7 +83,8 @@ func NewRabbitMQChannel(settings MessageQueueSettings) (*RabbitMQChannel, error)
 		return nil, err
 	}
 
-	rabbit := &RabbitMQChannel{
+	rabbit := &RabbitMQConnection{
+		nid:        nid,
 		connection: conn,
 		pubChannel: pch,
 		subChannel: sch,
@@ -93,15 +97,15 @@ func NewRabbitMQChannel(settings MessageQueueSettings) (*RabbitMQChannel, error)
 	return rabbit, nil
 }
 
-// CloseChannel underlying channel and connection
-func (mq *RabbitMQChannel) CloseChannel() {
+// Close underlying connection and channels
+func (mq *RabbitMQConnection) Close() {
 	mq.subChannel.Close()
 	mq.pubChannel.Close()
 	mq.connection.Close()
 }
 
 // PublishNotification send a notification to a RabbitMQ topic with the given routing key
-func (mq *RabbitMQChannel) PublishNotification(notification Notification) error {
+func (mq *RabbitMQConnection) PublishNotification(notification Notification) error {
 	body, err := json.Marshal(notification)
 	if err != nil {
 		return err
@@ -113,6 +117,7 @@ func (mq *RabbitMQChannel) PublishNotification(notification Notification) error 
 		false,         // mandatory
 		false,         // immediate
 		amqp.Publishing{
+			AppId:       mq.nid,
 			MessageId:   fmt.Sprintf("%d", notification.ID),
 			ContentType: "application/json",
 			Body:        body,
@@ -125,7 +130,7 @@ func (mq *RabbitMQChannel) PublishNotification(notification Notification) error 
 }
 
 // ConsumeNotifications gets a MessageConsumer for consuming messages from a RabbitMQ topic
-func (mq *RabbitMQChannel) ConsumeNotifications() (MessageConsumer, error) {
+func (mq *RabbitMQConnection) ConsumeNotifications() (MessageConsumer, error) {
 	msgs, err := mq.subChannel.Consume(
 		mq.queue, // queue
 		"",       // consumer

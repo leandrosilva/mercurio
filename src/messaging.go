@@ -9,10 +9,10 @@ type MessageQueueSettings struct {
 	RoutingKey string
 }
 
-// MessageQueueChannel is the interface to the message-oriented middleware which supports scale
+// MessageQueueConnection is the interface to the message-oriented middleware which supports scale
 // out this notification service, e.g. RabbitMQ, ActiveMQ, Amazon SQS, Redis Pub/Sub, etc
-type MessageQueueChannel interface {
-	CloseChannel()
+type MessageQueueConnection interface {
+	Close()
 	PublishNotification(notification Notification) error
 	ConsumeNotifications() (MessageConsumer, error)
 }

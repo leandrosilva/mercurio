@@ -9,6 +9,9 @@ import (
 
 // Mercurio is what you thing it is, or not
 type Mercurio struct {
+	// Node identification must be unique in a multi deployment setup
+	NID string
+
 	JWTAuth    JWTAuthMiddleware
 	Broker     *Broker
 	API        NotificationAPI
@@ -17,8 +20,7 @@ type Mercurio struct {
 
 // NewMercurio creates a new instance of Mercurio
 func NewMercurio() (*Mercurio, error) {
-	// Basic underlying setup
-	//
+	nid := GetNID()
 
 	authPrivateKey, err := GetAuthPrivateKey()
 	if err != nil {
@@ -50,7 +52,7 @@ func NewMercurio() (*Mercurio, error) {
 		return nil, fmt.Errorf("failed to get settings to connect to RabbitMQ server due to: %s", err)
 	}
 
-	broker, err := NewBroker(repository, mqSettings)
+	broker, err := NewBroker(nid, repository, mqSettings)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Broker due to: %s", err)
 	}
@@ -63,6 +65,7 @@ func NewMercurio() (*Mercurio, error) {
 	}
 
 	mercurio := &Mercurio{
+		NID:        nid,
 		JWTAuth:    jwtAuth,
 		Broker:     broker,
 		API:        api,
